@@ -61,6 +61,18 @@ npm run dev
 
 Paste a **LEP** or **mesh (LRM1)** hex line from serial; the map centers on the decoded position (SOS styled in red).
 
+### Peer map — Android APK (Capacitor)
+
+Requires **JDK 17**, **Android SDK**, and **Android Studio** (or Gradle on `PATH`). From `web/peer-map`:
+
+```bash
+npm install
+npm run cap:sync
+npm run cap:open
+```
+
+In Android Studio: **Build → Build Bundle(s) / APK(s) → Build APK(s)**. On Windows you can instead run `android\gradlew.bat assembleDebug` from `web/peer-map\android`; the debug APK is `android\app\build\outputs\apk\debug\app-debug.apk`. Install with **adb install** or copy the file to the device and allow install from unknown sources.
+
 ## Quick start (ESP32 frame builder)
 
 Install [PlatformIO](https://platformio.org/), then:

@@ -1,6 +1,10 @@
 node_modules/
 dist/
 web/peer-map/dist/
+web/peer-map/android/.gradle/
+web/peer-map/android/app/build/
+web/peer-map/android/build/
+web/peer-map/android/capacitor-cordova-android-plugins/build/
 .pio/
 .vscode/
 *.log
