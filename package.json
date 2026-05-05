@@ -1,0 +1,14 @@
+{
+  "name": "location-emitter",
+  "private": true,
+  "workspaces": [
+    "shared/packet",
+    "shared/mesh"
+  ],
+  "scripts": {
+    "build": "npm run build -w @location-emitter/packet && npm run build -w @location-emitter/mesh",
+    "test": "npm run build -w @location-emitter/packet && npm run test -w @location-emitter/packet && npm run test -w @location-emitter/mesh",
+    "decode-packet": "node tools/decode-packet.mjs",
+    "airtime": "node tools/lora-airtime.mjs"
+  }
+}

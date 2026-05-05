@@ -1,0 +1,6 @@
+node_modules/
+dist/
+web/peer-map/dist/
+.pio/
+.vscode/
+*.log

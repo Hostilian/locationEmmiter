@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Location Emitter — peer map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+      header { padding: 0.75rem 1rem; border-bottom: 1px solid #ccc; background: #f8f8f8; }
+      h1 { margin: 0; font-size: 1.1rem; }
+      .row { display: flex; flex: 1; min-height: 0; }
+      .panel { width: 320px; padding: 0.75rem; border-right: 1px solid #ccc; display: flex; flex-direction: column; gap: 0.5rem; }
+      textarea { flex: 1; min-height: 120px; font-family: ui-monospace, monospace; font-size: 12px; }
+      #map { flex: 1; min-height: 200px; }
+      button { padding: 0.4rem 0.75rem; cursor: pointer; }
+      .err { color: #b00020; font-size: 13px; white-space: pre-wrap; }
+      .hint { font-size: 12px; color: #555; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Offline geolocation emitter — decode & map</h1>
+    </header>
+    <div class="row">
+      <div class="panel">
+        <label for="hex"><strong>Hex bytes</strong> (LEP full/short or mesh LRM1+LEP)</label>
+        <textarea id="hex" placeholder="4C 47 45 4F 01 ..."></textarea>
+        <button type="button" id="go">Plot on map</button>
+        <p class="hint">Paste from serial log. <strong>One hex frame per line</strong> to plot multiple points; use mesh lines for LoRa.</p>
+        <div id="err" class="err"></div>
+      </div>
+      <div id="map"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
