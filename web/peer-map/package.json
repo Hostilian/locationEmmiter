@@ -27,6 +27,7 @@
     "demo:housekeep": "node ./scripts/demo-housekeep.mjs",
     "demo:status": "node ./scripts/demo-status.mjs",
     "demo:verify": "node ./scripts/demo-verify.mjs",
+    "demo:export": "node ./scripts/demo-export.mjs",
     "demo:ready": "npm run demo:clean && node ./scripts/demo-ready.mjs",
     "demo:studio": "npm run demo:ready && npm run cap:open",
     "demo:crosscheck": "node ./scripts/demo-crosscheck.mjs"

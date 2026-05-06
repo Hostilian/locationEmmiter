@@ -31,6 +31,7 @@ runStep("Archiving latest demo bundle", "npm run demo:archive");
 runStep("Housekeeping old demo artifacts", "npm run demo:housekeep");
 runStep("Generating demo latest status", "npm run demo:status");
 runStep("Verifying report/bundle/status consistency", "npm run demo:verify");
+runStep("Exporting release-ready demo snapshot", "npm run demo:export");
 
 if (!existsSync(apkPath)) {
   console.error(`[demo:crosscheck] APK missing at ${apkPath}`);

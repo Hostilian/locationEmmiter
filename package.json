@@ -20,6 +20,7 @@
     "demo:housekeep": "npm --prefix web/peer-map run demo:housekeep",
     "demo:status": "npm --prefix web/peer-map run demo:status",
     "demo:verify": "npm --prefix web/peer-map run demo:verify",
+    "demo:export": "npm --prefix web/peer-map run demo:export",
     "demo:crosscheck": "npm --prefix web/peer-map run demo:crosscheck",
     "decode-packet": "node tools/decode-packet.mjs",
     "decode-packet-all": "node tools/decode-packet.mjs --all-lines",

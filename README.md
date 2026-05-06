@@ -38,6 +38,7 @@ npm run demo:archive  # zip latest demo bundle for handoff
 npm run demo:housekeep # prune older demo artifacts
 npm run demo:status   # write latest demo status summary (md + json)
 npm run demo:verify   # validate report/bundle/status SHA consistency
+npm run demo:export   # export latest report/status/zip into one folder
 npm run demo:crosscheck # full quality + demo artifact cross-check
 ```
 

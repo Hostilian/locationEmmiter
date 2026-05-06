@@ -88,6 +88,12 @@ Verify SHA consistency between latest report, bundle manifest, and status summar
 npm run demo:verify
 ```
 
+Create a release-ready snapshot folder with latest zip + status + report:
+
+```bash
+npm run demo:export
+```
+
 Need a fallback installable build without opening Android Studio?
 
 ```bash
