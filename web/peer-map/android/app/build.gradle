@@ -16,13 +16,6 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
-        }
-    }
     signingConfigs {
         release {
             if (project.hasProperty('RELEASE_STORE_FILE') && project.RELEASE_STORE_FILE) {
@@ -31,6 +24,13 @@ android {
                 keyAlias project.findProperty('RELEASE_KEY_ALIAS') ?: ""
                 keyPassword project.findProperty('RELEASE_KEY_PASSWORD') ?: ""
             }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }

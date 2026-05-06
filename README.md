@@ -28,6 +28,10 @@ Offline-first **position beacons** for **peer tracking** and **SOS-style** use: 
 npm install
 npm run test
 npm run build
+npm run demo:ready    # peer-map Android preflight
+npm run demo:studio   # preflight + open Android Studio
+npm run demo:apk      # preflight + build Android debug APK
+npm run demo:crosscheck # full quality + demo artifact cross-check
 ```
 
 ## Operational runbooks

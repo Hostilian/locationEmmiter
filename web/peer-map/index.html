@@ -24,13 +24,13 @@
         --bg: #f4f6fb;
         --bg-elevated: #ffffff;
         --bg-soft: #edf2fa;
-        --surface: rgba(255, 255, 255, 0.86);
+        --surface: rgba(255, 255, 255, 0.7);
         --surface-strong: #ffffff;
         --surface-muted: #eef3fb;
         --text: #111827;
         --text-muted: #4b5563;
         --text-soft: #6b7280;
-        --border: #d8e0ee;
+        --border: rgba(216, 224, 238, 0.5);
         --border-strong: #c3cde0;
         --ring: #5f6fff;
         --accent: #4256e8;
@@ -47,19 +47,20 @@
         --shadow-md: 0 12px 28px rgba(15, 23, 42, 0.1);
         --radius-sm: 10px;
         --radius-md: 14px;
-        --radius-lg: 18px;
+        --radius-lg: 20px;
+        --glass-blur: 12px;
       }
       html.theme-dark {
-        --bg: #10151e;
+        --bg: #0a0e14;
         --bg-elevated: #141b26;
-        --bg-soft: #1b2431;
-        --surface: rgba(20, 27, 38, 0.84);
+        --bg-soft: #111823;
+        --surface: rgba(20, 27, 38, 0.65);
         --surface-strong: #172131;
         --surface-muted: #1d2938;
         --text: #eaf1ff;
         --text-muted: #c4d0e6;
         --text-soft: #9eb0cc;
-        --border: #2c3a4e;
+        --border: rgba(44, 58, 78, 0.5);
         --border-strong: #3a4b63;
         --ring: #9db5ff;
         --accent: #8ca7ff;
@@ -83,7 +84,8 @@
         flex-direction: column;
         min-height: 100dvh;
         min-height: 100vh;
-        background: radial-gradient(1200px 800px at 20% -30%, var(--bg-soft), var(--bg));
+        background: radial-gradient(circle at 0% 0%, var(--bg-soft) 0%, var(--bg) 50%);
+        background-attachment: fixed;
         color: var(--text);
       }
       .app-header {
@@ -92,8 +94,8 @@
         z-index: 10;
         padding: 0.85rem 1rem 0.75rem;
         padding-top: max(0.85rem, env(safe-area-inset-top));
-        background: color-mix(in srgb, var(--surface-strong) 85%, transparent);
-        backdrop-filter: blur(9px);
+        background: rgba(var(--surface-strong), 0.7);
+        backdrop-filter: blur(var(--glass-blur));
         border-bottom: 1px solid var(--border);
       }
       .header-inner { max-width: 1200px; margin: 0 auto; }
@@ -168,15 +170,21 @@
         min-height: 0;
       }
       .panel {
-        padding: 0.88rem;
+        padding: 1.2rem;
         display: flex;
         flex-direction: column;
-        gap: 0.55rem;
+        gap: 0.8rem;
         min-height: 0;
         border-radius: var(--radius-lg);
         border: 1px solid var(--border);
         background: var(--surface);
+        backdrop-filter: blur(var(--glass-blur));
         box-shadow: var(--shadow-sm);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+      .panel:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
       }
       @media (min-width: 960px) {
         .layout {
@@ -404,6 +412,42 @@
         margin: 0.15rem 0 0;
         font-variant-numeric: tabular-nums;
       }
+      /* Toast system */
+      #toast-container {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        pointer-events: none;
+      }
+      .toast {
+        padding: 0.75rem 1.25rem;
+        background: var(--surface-strong);
+        color: var(--text);
+        border: 1px solid var(--border-strong);
+        border-radius: 99px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        box-shadow: var(--shadow-md);
+        backdrop-filter: blur(var(--glass-blur));
+        pointer-events: auto;
+        animation: slide-up 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+      }
+      .toast-ok { border-color: var(--ok); color: var(--ok); }
+      .toast-err { border-color: var(--danger); color: var(--danger); }
+      @keyframes slide-up {
+        from { transform: translateY(100%); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      .fade-out {
+        opacity: 0;
+        transform: scale(0.95);
+        transition: opacity 0.4s ease, transform 0.4s ease;
+      }
       @media (prefers-contrast: more) {
         :root {
           --border: #9aa8be;
@@ -590,6 +634,7 @@
         <section id="map" aria-label="Map"></section>
       </div>
     </div>
+    <div id="toast-container"></div>
     <footer class="app-footer">
       LEP v1 on-air layout and mesh LRM1 wrapper — see <code>spec/on-air-packet-v1.md</code> and <code>docs/MESH_FRAME.md</code> in the repo. Map tiles © OpenStreetMap contributors.
     </footer>
