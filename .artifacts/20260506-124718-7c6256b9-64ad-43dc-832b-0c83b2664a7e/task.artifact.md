@@ -1,0 +1,25 @@
+# Task Management
+
+- [/] Modernize Location Emitter for 2026
+	- [x] Initial Research and Exploration
+	- [/] Implementation Planning
+		- [x] Create implementation plan
+		- [ ] Get user approval
+	- [ ] Dependency Updates
+	- [ ] Web App Refactoring
+		- [ ] Create `ui.ts`
+		- [ ] Create `map.ts`
+		- [ ] Create `state.ts`
+		- [ ] Create `logic.ts`
+		- [ ] Refactor `main.ts`
+	- [ ] UI/UX Overhaul
+		- [ ] Update CSS in `index.html`
+		- [ ] Implement Toast notifications
+		- [ ] Add transitions
+	- [ ] Functional Enhancements
+		- [ ] Implement Live Metrics
+		- [ ] Add Haptic feedback (Capacitor)
+	- [ ] Verification
+		- [ ] Run unit tests
+		- [ ] Manual UI audit
+		- [ ] Android verification
