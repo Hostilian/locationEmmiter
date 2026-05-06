@@ -12,6 +12,10 @@ function isoUtc(unix: number): string {
 
 /** GPX 1.1 document with one waypoint per packet (oldest → newest). */
 export function packetsToGpx(packets: LocationEmitterPacketV1[], trackName = 'location-emitter'): string {
+  const exportedAt = new Date().toISOString();
+  const nsos = packets.filter((p) => (p.flags & FLAG_SOS) !== 0).length;
+  const ndev = new Set(packets.map((p) => hex8(p.deviceId))).size;
+  const metaDesc = `${packets.length} waypoint(s), ${ndev} device ID(s), ${nsos} SOS — LEP v1`;
   const wpts = packets.map((p) => {
     const lat = p.latE7 / 1e7;
     const lon = p.lonE7 / 1e7;
@@ -24,7 +28,11 @@ export function packetsToGpx(packets: LocationEmitterPacketV1[], trackName = 'lo
     return `  <wpt lat="${lat}" lon="${lon}">\n    <name>${escapeXml(name)}</name>${ele}${timeEl}${desc}\n  </wpt>`;
   });
   return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="location-emitter" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="location-emitter/LEP-v1" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <time>${exportedAt}</time>
+    <desc>${escapeXml(metaDesc)}</desc>
+  </metadata>
   <trk><name>${escapeXml(trackName)}</name></trk>
 ${wpts.join('\n')}
 </gpx>

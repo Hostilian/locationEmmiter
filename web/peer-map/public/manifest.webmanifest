@@ -1,0 +1,19 @@
+{
+  "name": "Location Emitter - peer map",
+  "short_name": "LEP Map",
+  "description": "Decode LEP and mesh (LRM1) hex, plot on a map, export GPX / CSV / GeoJSON.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f0f2f5",
+  "theme_color": "#1a237e",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

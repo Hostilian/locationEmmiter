@@ -14,7 +14,8 @@ Offline-first **position beacons** for **peer tracking** and **SOS-style** use: 
 | [docs/FIELD_TEST_MATRIX.md](docs/FIELD_TEST_MATRIX.md) | **Field test** checklist (city vs open terrain, power) |
 | [docs/MESH_FRAME.md](docs/MESH_FRAME.md) | LoRa **LRM1** mesh wrapper |
 | [docs/EMERGENCY_WORKFLOW.md](docs/EMERGENCY_WORKFLOW.md) | SOS / last-known-good / CLI |
-| [web/peer-map/](web/peer-map/) | Vite **Leaflet** peer map (paste hex) |
+| [web/peer-map/](web/peer-map/) | Vite **Leaflet** peer map (paste hex) + **Capacitor Android** shell |
+| [docs/ANDROID_STUDIES.md](docs/ANDROID_STUDIES.md) | **Android** build, live reload, study tracks, native extensions |
 | [docs/OFF_GRID_ARCHITECTURE_REFERENCE.md](docs/OFF_GRID_ARCHITECTURE_REFERENCE.md) | Urban vs remote **RF strategies**, GNSS/satellite context, **legal** guardrails (maps long-form research to this repo) |
 | [docs/REFERENCES.md](docs/REFERENCES.md) | **Bibliography** (GNSS, LoRa/ETSI, Meshtastic/ATAK, satellite IoT, SAR/legal context) |
 | [docs/BOARDS.md](docs/BOARDS.md) | ESP32 **board presets** (T-Beam, Heltec) and **RX** firmware envs |
@@ -25,7 +26,7 @@ Offline-first **position beacons** for **peer tracking** and **SOS-style** use: 
 
 ```bash
 npm install
-npm test
+npm run test
 npm run build
 ```
 
@@ -38,16 +39,21 @@ npm run build
 
 ```bash
 npm run build
-node tools/decode-packet.mjs 4C 52 4D 31 ...
+npm run decode-packet -- -- 4C 52 4D 31 ...
+npm run decode-packet-all -- -- --file path/to/log.txt
+npm run decode-packet-all-jsonl -- -- --file path/to/log.txt
 ```
 
-Hex can be a single run of digits (no spaces) or piped/redirected into stdin when it is not a TTY.
+Hex can be a single run of digits (no spaces) or piped/redirected into stdin when it is not a TTY. Use **`--file path`** to read from a file (first non-empty line if there are several, unless **`--all-lines`** / **`-a`** decodes every line into one JSON report). Root scripts: **`npm run decode-packet`**, **`npm run decode-packet-all`** (pass **`-- --`** then CLI args). Batch mode supports **`--jsonl`** with **`--all-lines`** (one JSON object per stdout line). **`--quiet`** / **`-q`** suppresses stdout on success (errors still on stderr); on Windows PowerShell prefer **`--quiet`** so `-q` is not swallowed by the shell. **`--help`** lists options. **`--version`** / **`-V`** / **`-v`** prints the **`@location-emitter/packet`** semver used for decode.
 
 ## LoRa airtime (duty planning)
 
 ```bash
-npm run airtime -- --sf 9 --bw 125 --cr 7 --payload 72
+npm run airtime -- -- --sf 9 --bw 125 --cr 7 --payload 72
+npm run airtime -- -- --version
 ```
+
+**`--help`** / **`--version`** (or **`-v`**) work like the decode tool; semver comes from **`@location-emitter/packet`**.
 
 See [docs/REGULATORY_AIRTIME.md](docs/REGULATORY_AIRTIME.md).
 
@@ -59,19 +65,20 @@ npm install
 npm run dev
 ```
 
-Paste a **LEP** or **mesh (LRM1)** hex line from serial; the map centers on the decoded position (SOS styled in red).
+Paste a **LEP** or **mesh (LRM1)** hex line from serial (flexible separators: spaces, commas, or a continuous hex string); the map centers on the decoded position (SOS styled in red). **Paste clipboard** appends from the system clipboard and plots (handy on Android). **Encode** builds full LEP, BLE short, and mesh wires from GNSS, with **Mesh → decode** round-trip, **Fit all markers**, and **Ctrl+Enter** to plot (no BLE advertising from the browser). The peer map UI supports **Auto / Light / Dark** theme (saved in `localStorage`), keeps a **session draft** of hex and encode fields while the tab is open, restores **map pan/zoom** in the same session (unless you open a **`hex` URL**), reports **which lines** failed (with **decoder reasons** for bad frames), offers **sample hex** and **load file** (size-capped) for quick tests, draws a **dashed path** through multi-point decodes (stroke updates when you change theme), shows an **offline** hint when the network drops, and can **download GPX, CSV, or GeoJSON** (GeoJSON includes **`meta`** counts; CSV UTF-8 **with BOM** for Excel) from the last plotted decode plus an optional encode pin.
 
-### Peer map — Android APK (Capacitor)
+### Peer map — Android (Capacitor)
 
-Requires **JDK 17**, **Android SDK**, and **Android Studio** (or Gradle on `PATH`). From `web/peer-map`:
+Requires **JDK 17**, **Android SDK**, and **Android Studio** (or Gradle). From `web/peer-map`:
 
 ```bash
 npm install
-npm run cap:sync
-npm run cap:open
+npm run cap:sync      # web build + copy into android/
+npm run cap:open      # Android Studio
+# or: npm run cap:run  # build, sync, run on device/emulator
 ```
 
-In Android Studio: **Build → Build Bundle(s) / APK(s) → Build APK(s)**. On Windows you can instead run `android\gradlew.bat assembleDebug` from `web/peer-map\android`; the debug APK is `android\app\build\outputs\apk\debug\app-debug.apk`. Install with **adb install** or copy the file to the device and allow install from unknown sources.
+Debug APK: `web/peer-map/android/app/build/outputs/apk/debug/app-debug.apk` (e.g. `gradlew.bat assembleDebug` under `android/`). Install with **adb** or sideload; grant **location** for **Use my location**. **Study guide** (live reload, permissions, extension ideas): [docs/ANDROID_STUDIES.md](docs/ANDROID_STUDIES.md).
 
 ## Quick start (ESP32 frame builder)
 

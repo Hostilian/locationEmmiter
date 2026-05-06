@@ -2,37 +2,482 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" id="meta-theme-color" content="#1a237e" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="LEP Map" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Location Emitter — peer map</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
       * { box-sizing: border-box; }
-      body { margin: 0; font-family: system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; }
-      header { padding: 0.75rem 1rem; border-bottom: 1px solid #ccc; background: #f8f8f8; }
-      h1 { margin: 0; font-size: 1.1rem; }
-      .row { display: flex; flex: 1; min-height: 0; }
-      .panel { width: 320px; padding: 0.75rem; border-right: 1px solid #ccc; display: flex; flex-direction: column; gap: 0.5rem; }
-      textarea { flex: 1; min-height: 120px; font-family: ui-monospace, monospace; font-size: 12px; }
-      #map { flex: 1; min-height: 200px; }
-      button { padding: 0.4rem 0.75rem; cursor: pointer; }
-      .err { color: #b00020; font-size: 13px; white-space: pre-wrap; }
-      .hint { font-size: 12px; color: #555; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        font-family: system-ui, sans-serif;
+        display: flex;
+        flex-direction: column;
+        min-height: 100dvh;
+        min-height: 100vh;
+        background: #f0f2f5;
+        color: #1a1a1a;
+      }
+      header {
+        padding: 0.65rem 1rem;
+        padding-top: max(0.65rem, env(safe-area-inset-top));
+        border-bottom: 1px solid #c5cae9;
+        background: linear-gradient(180deg, #e8eaf6 0%, #dce0f5 100%);
+        flex-shrink: 0;
+      }
+      header h1 { margin: 0; font-size: clamp(1rem, 3.5vw, 1.15rem); font-weight: 650; }
+      header p { margin: 0.35rem 0 0; font-size: 0.8rem; color: #424242; max-width: 52rem; }
+
+      .net-banner {
+        display: block;
+        margin-top: 0.4rem;
+        padding: 0.35rem 0.55rem;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        background: #fff3e0;
+        color: #bf360c;
+        max-width: 52rem;
+      }
+      html.theme-dark .net-banner {
+        background: #3e2723;
+        color: #ffcc80;
+      }
+
+      .help-details {
+        margin-top: 0.45rem;
+        font-size: 0.78rem;
+        color: #424242;
+        max-width: 52rem;
+      }
+      .help-details summary {
+        cursor: pointer;
+        color: #3949ab;
+        font-weight: 600;
+      }
+      html.theme-dark .help-details { color: #bdc1c6; }
+      html.theme-dark .help-details summary { color: #8ab4f8; }
+      .help-details ul { margin: 0.35rem 0 0; padding-left: 1.2rem; line-height: 1.45; }
+      kbd {
+        font-family: ui-monospace, monospace;
+        font-size: 0.88em;
+        padding: 0.06rem 0.28rem;
+        border: 1px solid #bdbdbd;
+        border-radius: 4px;
+        background: #f5f5f5;
+      }
+      html.theme-dark kbd {
+        border-color: #5f6368;
+        background: #2d2d2d;
+        color: #e8eaed;
+      }
+
+      .layout {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto 1fr;
+        gap: 0;
+        min-height: 0;
+      }
+      @media (min-width: 880px) {
+        .layout {
+          grid-template-columns: minmax(300px, 380px) 1fr;
+          grid-template-rows: auto 1fr;
+        }
+        .panel-decode { grid-column: 1; grid-row: 1; }
+        .panel-encode { grid-column: 1; grid-row: 2; min-height: 0; }
+        .map-wrap {
+          grid-column: 2;
+          grid-row: 1 / span 2;
+          border-left: 1px solid #bdbdbd;
+        }
+      }
+
+      .panel {
+        padding: 0.75rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        min-height: 0;
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      @media (min-width: 880px) {
+        .panel-decode { border-bottom: 1px solid #e0e0e0; }
+        .panel-encode { border-bottom: none; }
+      }
+
+      .panel h2 {
+        margin: 0;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #3949ab;
+      }
+
+      label { font-size: 0.9rem; }
+      textarea, input[type="text"] {
+        width: 100%;
+        font-family: ui-monospace, monospace;
+        font-size: 13px;
+        border: 1px solid #bdbdbd;
+        border-radius: 6px;
+        padding: 0.45rem 0.5rem;
+      }
+      textarea { min-height: 100px; resize: vertical; }
+      .out-hex { min-height: 52px; font-size: 12px; line-height: 1.35; }
+
+      .row-inline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem 1rem;
+        font-size: 0.9rem;
+      }
+      .row-inline label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+
+      .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+      button {
+        padding: 0.5rem 0.9rem;
+        cursor: pointer;
+        border-radius: 6px;
+        border: 1px solid #5c6bc0;
+        background: #5c6bc0;
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 500;
+      }
+      button:hover { background: #3f51b5; border-color: #3f51b5; }
+      button.secondary {
+        background: #fff;
+        color: #3949ab;
+        border-color: #9fa8da;
+      }
+      button.secondary:hover { background: #e8eaf6; }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      button:focus-visible {
+        outline: 2px solid #3949ab;
+        outline-offset: 2px;
+      }
+      button, textarea, input[type="text"] { touch-action: manipulation; }
+
+      .err { color: #b00020; font-size: 0.85rem; white-space: pre-wrap; }
+      .hint { font-size: 0.78rem; color: #616161; margin: 0; line-height: 1.4; }
+      .device-id { font-size: 0.78rem; color: #424242; word-break: break-all; }
+
+      .map-wrap {
+        position: relative;
+        min-height: 220px;
+        min-height: max(220px, 38dvh);
+      }
+      @media (min-width: 880px) {
+        .map-wrap { min-height: 0; }
+      }
+      #map { position: absolute; inset: 0; z-index: 0; }
+
+      .encode-block { display: flex; flex-direction: column; gap: 0.35rem; }
+      .encode-block label { font-size: 0.8rem; color: #424242; }
+
+      .map-toolbar {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: flex-end;
+        pointer-events: none;
+      }
+      .map-toolbar button {
+        pointer-events: auto;
+        padding: 0.35rem 0.55rem;
+        font-size: 0.8rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      }
+      .map-toolbar .theme-toggle {
+        pointer-events: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-items: stretch;
+      }
+      .map-toolbar .theme-toggle button {
+        min-width: 4.25rem;
+        text-align: center;
+        font-size: 0.72rem;
+        padding: 0.28rem 0.45rem;
+        opacity: 0.88;
+      }
+      .map-toolbar .theme-toggle button.is-active {
+        opacity: 1;
+        font-weight: 650;
+        box-shadow: 0 0 0 2px rgba(63, 81, 181, 0.45);
+      }
+
+      .encode-summary {
+        font-size: 0.78rem;
+        color: #37474f;
+        background: #eceff1;
+        border-radius: 6px;
+        padding: 0.45rem 0.55rem;
+        line-height: 1.45;
+        font-variant-numeric: tabular-nums;
+      }
+      .byte-meter { font-size: 0.75rem; color: #616161; margin: -0.2rem 0 0; }
+      .byte-meter.warn { color: #c62828; font-weight: 600; }
+      .decode-detail {
+        font-size: 0.78rem;
+        color: #5d4037;
+        background: #fff8e1;
+        border-radius: 6px;
+        padding: 0.4rem 0.55rem;
+        margin: 0;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      html.theme-dark .decode-detail {
+        color: #ffe0b2;
+        background: #3e2723;
+      }
+
+      .decode-ok {
+        color: #2e7d32;
+        font-size: 0.85rem;
+        min-height: 1.2em;
+        white-space: pre-wrap;
+      }
+
+      .map-legend {
+        position: absolute;
+        bottom: 28px;
+        left: 10px;
+        z-index: 1000;
+        font-size: 0.72rem;
+        line-height: 1.5;
+        background: rgba(255, 255, 255, 0.94);
+        color: #333;
+        border-radius: 6px;
+        padding: 0.35rem 0.5rem;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+        pointer-events: none;
+      }
+      .map-legend span { display: block; }
+      .map-legend .dot { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 50%; margin-right: 0.35rem; vertical-align: 0.05em; }
+      .map-legend .decode-dot { background: #5c6bc0; }
+      .map-legend .encode-dot { background: #1565c0; }
+      .map-legend .sos-dot { background: #c62828; }
+      .map-legend .legend-dash { font-size: 0.68rem; opacity: 0.88; padding-left: 0.1rem; }
+
+      html.theme-dark body {
+        background: #121212;
+        color: #e8eaed;
+      }
+      html.theme-dark header {
+        border-bottom-color: #3c4043;
+        background: linear-gradient(180deg, #1e1f24 0%, #25262c 100%);
+      }
+      html.theme-dark header p { color: #bdc1c6; }
+      html.theme-dark .panel {
+        background: #1e1e1e;
+        border-bottom-color: #3c4043;
+      }
+      @media (min-width: 880px) {
+        html.theme-dark .map-wrap { border-left-color: #3c4043; }
+      }
+      html.theme-dark .panel h2 { color: #8ab4f8; }
+      html.theme-dark label { color: #e8eaed; }
+      html.theme-dark textarea,
+      html.theme-dark input[type="text"] {
+        background: #2d2d2d;
+        border-color: #5f6368;
+        color: #e8eaed;
+      }
+      html.theme-dark button {
+        background: #5c6bc0;
+        border-color: #7986cb;
+      }
+      html.theme-dark button:hover { background: #7986cb; }
+      html.theme-dark button.secondary {
+        background: #2d2d2d;
+        color: #8ab4f8;
+        border-color: #5f6368;
+      }
+      html.theme-dark button.secondary:hover { background: #3c4043; }
+      html.theme-dark button:focus-visible { outline-color: #8ab4f8; }
+      html.theme-dark .hint { color: #9aa0a6; }
+      #decode-stats:not([hidden]) {
+        margin: 0.15rem 0 0;
+        font-variant-numeric: tabular-nums;
+      }
+      html.theme-dark .device-id { color: #bdc1c6; }
+      html.theme-dark .encode-block label { color: #bdc1c6; }
+      html.theme-dark .encode-summary {
+        background: #2d2d2d;
+        color: #bdc1c6;
+      }
+      html.theme-dark .byte-meter { color: #9aa0a6; }
+      html.theme-dark .map-toolbar button { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
+      html.theme-dark .map-legend {
+        background: rgba(30, 30, 30, 0.94);
+        color: #e8eaed;
+      }
+      html.theme-dark .decode-ok { color: #81c784; }
+      html.theme-dark .err { color: #ff8a80; }
+      html.theme-dark .map-toolbar .theme-toggle button.is-active {
+        box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.5);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+      }
+
+      .app-footer {
+        flex-shrink: 0;
+        font-size: 0.72rem;
+        color: #757575;
+        padding: 0.4rem 1rem max(0.5rem, env(safe-area-inset-bottom));
+        text-align: center;
+        border-top: 1px solid #e0e0e0;
+        background: #fafafa;
+        line-height: 1.4;
+      }
+      html.theme-dark .app-footer {
+        color: #9aa0a6;
+        border-top-color: #3c4043;
+        background: #1a1a1a;
+      }
     </style>
   </head>
   <body>
     <header>
-      <h1>Offline geolocation emitter — decode & map</h1>
+      <h1>Location Emitter — decode &amp; map</h1>
+      <p>Paste LEP or mesh hex from serial, or build frames from this phone’s GNSS (no on-air BLE from the browser).</p>
+      <p id="capacitor-hint" class="hint" hidden>
+        <strong>Android app:</strong> allow <strong>location</strong> for this app in system settings if <em>Use my location</em> fails.
+      </p>
+      <div id="net-offline" class="net-banner" hidden role="status">You appear offline — map tiles may not load until you reconnect.</div>
+      <details class="help-details">
+        <summary>Help &amp; shortcuts</summary>
+        <ul>
+          <li><strong>Plot:</strong> button or <kbd>Ctrl</kbd>+<kbd>Enter</kbd> in the hex field (Mac: <kbd>Cmd</kbd>+<kbd>Enter</kbd>).</li>
+          <li><strong>Focus hex:</strong> press <kbd>/</kbd> when focus is not in a text field (useful for keyboard-only use).</li>
+          <li><strong>This panel:</strong> press <kbd>?</kbd> (shift+<kbd>/</kbd>) to open Help from the map or page background.</li>
+          <li><strong>Paste clipboard</strong> appends hex from the system clipboard (useful on Android after copying from a terminal or chat).</li>
+          <li><strong>Shareable link:</strong> <em>Copy link</em> (or open with <code>?hex=…</code> / <code>#hex=…</code>) to prefill and plot; very long payloads use the hash (length capped).</li>
+          <li><strong>Load file</strong> accepts text logs; max about <strong>1.5 MB</strong> per file.</li>
+          <li><strong>Export:</strong> GPX / CSV / GeoJSON use the last plotted decode markers plus the encode pin if shown. On Android, the system <strong>share sheet</strong> opens when the browser supports file sharing; otherwise a download runs.</li>
+          <li><strong>Theme:</strong> Auto follows the device; Light/Dark are saved for next visit.</li>
+          <li><strong>Install:</strong> browsers can add this app to the home screen (manifest); Android also has the Capacitor build.</li>
+        </ul>
+      </details>
     </header>
-    <div class="row">
-      <div class="panel">
-        <label for="hex"><strong>Hex bytes</strong> (LEP full/short or mesh LRM1+LEP)</label>
-        <textarea id="hex" placeholder="4C 47 45 4F 01 ..."></textarea>
-        <button type="button" id="go">Plot on map</button>
-        <p class="hint">Paste from serial log. <strong>One hex frame per line</strong> to plot multiple points; use mesh lines for LoRa.</p>
-        <div id="err" class="err"></div>
+    <div class="layout">
+      <section class="panel panel-decode" aria-labelledby="decode-heading">
+        <h2 id="decode-heading">Decode</h2>
+        <label for="hex"><strong>Hex</strong> — spaces, commas, or one continuous string per line</label>
+        <textarea id="hex" placeholder="4C 47 45 4F 01 … or 4C47454F01…" autocomplete="off" spellcheck="false"></textarea>
+        <p id="hex-line-meter" class="byte-meter" aria-live="polite">0 non-empty lines</p>
+        <input type="file" id="hex-file" accept=".txt,.hex,text/plain,.log" hidden />
+        <div class="btn-row">
+          <button type="button" id="go">Plot on map</button>
+          <button type="button" id="clear-decode" class="secondary">Clear hex &amp; markers</button>
+          <button type="button" id="copy-share-link" class="secondary" disabled title="Add hex to build a shareable URL">
+            Copy link
+          </button>
+        </div>
+        <div class="btn-row">
+          <button type="button" id="sample-hex" class="secondary" title="One valid full LEP + SOS demo">Sample hex</button>
+          <button type="button" id="load-hex-file" class="secondary">Load file…</button>
+          <button type="button" id="paste-hex-clipboard" class="secondary" title="Append from system clipboard and plot">
+            Paste clipboard
+          </button>
+        </div>
+        <p class="hint">One frame per line for multiple markers. Mesh lines (LRM1…) unwrap automatically. With 2+ good decode lines, a dashed line links points in paste order.</p>
+        <div id="decode-ok" class="decode-ok" aria-live="polite"></div>
+        <p id="decode-stats" class="hint" hidden aria-live="polite"></p>
+        <div id="err" class="err" role="alert"></div>
+        <pre id="decode-detail" class="decode-detail" hidden></pre>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="copy-plotted-hex" disabled title="Copy lines that decoded successfully">
+            Copy plotted hex
+          </button>
+          <button type="button" class="secondary" id="export-gpx" disabled title="Plot at least one packet first">Export GPX</button>
+          <button type="button" class="secondary" id="export-csv" disabled title="Plot at least one packet first">Export CSV</button>
+          <button type="button" class="secondary" id="export-geojson" disabled title="Plot at least one packet first">GeoJSON</button>
+        </div>
+        <p class="hint">Export uses the last successful decode plus the encode pin if you plotted it (same order on the map). GeoJSON includes a top-level <code>meta</code> object (export time, counts). Map pan/zoom is restored for the session unless you open a <code>?hex=</code> / <code>#hex=</code> link.</p>
+      </section>
+
+      <section class="panel panel-encode" aria-labelledby="encode-heading">
+        <h2 id="encode-heading">Encode (this device)</h2>
+        <p class="device-id">Device ID (8 B, stored locally): <strong id="device-id-hex">—</strong></p>
+        <div class="row-inline">
+          <label><input type="checkbox" id="encode-sos" /> SOS flag</label>
+          <label><input type="checkbox" id="encode-relay" checked /> Relay-eligible</label>
+        </div>
+        <label for="encode-text">Note (≤32 UTF-8 B, full wire only)</label>
+        <input type="text" id="encode-text" maxlength="64" placeholder="optional" autocomplete="off" />
+        <p id="encode-text-bytes" class="byte-meter" aria-live="polite">0 / 32 UTF-8 bytes</p>
+        <div class="btn-row">
+          <button type="button" id="encode-locate">Use my location</button>
+          <button type="button" id="encode-plot" class="secondary" disabled title="Encode first">Plot encode on map</button>
+        </div>
+        <div id="encode-summary" class="encode-summary" hidden></div>
+        <p id="encode-status" class="hint" aria-live="polite"></p>
+        <div id="encode-err" class="err" role="alert"></div>
+
+        <div class="encode-block">
+          <label for="out-full">Full LEP (variable length)</label>
+          <textarea id="out-full" class="out-hex" readonly rows="2" placeholder="(encode to fill)"></textarea>
+          <button type="button" class="secondary" id="copy-full">Copy full</button>
+        </div>
+        <div class="encode-block">
+          <label for="out-ble">BLE short (27 B)</label>
+          <textarea id="out-ble" class="out-hex" readonly rows="2" placeholder="(encode to fill)"></textarea>
+          <button type="button" class="secondary" id="copy-ble">Copy BLE</button>
+        </div>
+        <div class="encode-block">
+          <label for="out-mesh">Mesh LRM1 + full LEP</label>
+          <textarea id="out-mesh" class="out-hex" readonly rows="2" placeholder="(encode to fill)"></textarea>
+          <div class="btn-row">
+            <button type="button" class="secondary" id="copy-mesh">Copy mesh</button>
+            <button type="button" class="secondary" id="mesh-to-decode">Mesh → decode</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="secondary" id="copy-all-wires">Copy all three (full, BLE, mesh)</button>
+        </div>
+      </section>
+
+      <div class="map-wrap">
+        <div class="map-toolbar" role="toolbar" aria-label="Map tools">
+          <button type="button" id="fit-all" class="secondary">Fit all markers</button>
+          <div class="theme-toggle" role="group" aria-label="Color theme">
+            <button type="button" id="theme-system" class="secondary is-active" title="Match device">Auto</button>
+            <button type="button" id="theme-light" class="secondary" title="Light UI">Light</button>
+            <button type="button" id="theme-dark" class="secondary" title="Dark UI">Dark</button>
+          </div>
+        </div>
+        <div class="map-legend" aria-hidden="true">
+          <span><span class="dot decode-dot"></span>Decode markers</span>
+          <span class="legend-dash">— dashed = decode order</span>
+          <span><span class="dot encode-dot"></span>Encode (this device)</span>
+          <span><span class="dot sos-dot"></span>SOS when flagged</span>
+        </div>
+        <div id="map" role="application" aria-label="Map"></div>
       </div>
-      <div id="map"></div>
     </div>
+    <footer class="app-footer">
+      LEP v1 on-air layout and mesh LRM1 wrapper — see <code>spec/on-air-packet-v1.md</code> and <code>docs/MESH_FRAME.md</code> in the repo. Map tiles © OpenStreetMap contributors.
+    </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

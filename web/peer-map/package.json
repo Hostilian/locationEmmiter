@@ -8,10 +8,14 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "cap:sync": "npm run build && npx cap sync android",
-    "cap:open": "npx cap open android"
+    "cap:open": "npx cap open android",
+    "cap:run": "npm run build && npx cap run android",
+    "cap:copy": "npm run build && npx cap copy android",
+    "cap:doctor": "npx cap doctor"
   },
   "dependencies": {
     "@capacitor/android": "^7.2.0",
+    "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.2.0",
     "leaflet": "^1.9.4"
   },

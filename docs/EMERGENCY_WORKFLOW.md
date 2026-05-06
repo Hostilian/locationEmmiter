@@ -20,5 +20,5 @@
 After `npm run build`:
 
 ```bash
-node tools/decode-packet.mjs 4C 52 4D 31 ...
+npm run decode-packet -- -- 4C 52 4D 31 ...
 ```

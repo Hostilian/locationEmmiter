@@ -5,6 +5,9 @@ web/peer-map/android/.gradle/
 web/peer-map/android/app/build/
 web/peer-map/android/build/
 web/peer-map/android/capacitor-cordova-android-plugins/build/
+web/peer-map/android/local.properties
+web/peer-map/android/.idea/
+web/peer-map/android/*.iml
 .pio/
 .vscode/
 *.log

@@ -6,15 +6,36 @@
  * Usage:
  *   node tools/lora-airtime.mjs --sf 9 --bw 125 --cr 7 --payload 80
  *   node tools/lora-airtime.mjs --sf 12 --bw 125 --cr 8 --payload 24 --preamble 8
+ *   node tools/lora-airtime.mjs --help
+ *   node tools/lora-airtime.mjs --version
  *
  * --bw is in **kHz** (e.g. 125). --cr is RadioLib-style **5–8** (4/5 … 4/8).
  * Not legal advice; verify ETSI / FCC rules for your band and device class.
  */
+import fs from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const HELP = `Usage: node tools/lora-airtime.mjs --sf <6-12> --bw <kHz> --cr <5-8> --payload <bytes> [--preamble <sym>]
+
+Example: node tools/lora-airtime.mjs --sf 9 --bw 125 --cr 7 --payload 72
+
+  --help / -h
+  --version / -V / -v   (semver from @location-emitter/packet)`;
+
+function packetLibVersion() {
+  try {
+    const pj = JSON.parse(fs.readFileSync(join(__dirname, '../shared/packet/package.json'), 'utf8'));
+    return typeof pj.version === 'string' ? pj.version : '0.0.0';
+  } catch {
+    return 'unknown';
+  }
+}
 
 function usage() {
-  console.error(`Usage: node tools/lora-airtime.mjs --sf <6-12> --bw <kHz> --cr <5-8> --payload <bytes> [--preamble <sym>]
-
-Example: node tools/lora-airtime.mjs --sf 9 --bw 125 --cr 7 --payload 72`);
+  console.error(HELP);
   process.exit(2);
 }
 
@@ -55,6 +76,16 @@ function payloadSymbolCount(payloadBytes, sf, cr) {
 }
 
 function main() {
+  const av = process.argv.slice(2);
+  if (av.length === 1 && (av[0] === '--help' || av[0] === '-h')) {
+    console.log(HELP);
+    process.exit(0);
+  }
+  if (av.length === 1 && (av[0] === '--version' || av[0] === '-V' || av[0] === '-v')) {
+    console.log(`lora-airtime @location-emitter/packet ${packetLibVersion()}`);
+    process.exit(0);
+  }
+
   const { sf, bw, cr, payload, preamble } = parseArgs();
   const ts = symbolSec(sf, bw);
   const nPayload = payloadSymbolCount(payload, sf, cr);
