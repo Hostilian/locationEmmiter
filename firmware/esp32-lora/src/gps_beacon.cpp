@@ -4,6 +4,7 @@
 #include <cstring>
 #include <gnss_nmea.h>
 #include <gps_beacon.h>
+#include <duty_cycle.h>
 #include <lep_mesh.h>
 #include <lep_v1.h>
 #include <lora_config.h>
@@ -21,6 +22,7 @@ static HardwareSerial *gps_serial = nullptr;
 static char nmea_buf[LEP_GPS_NMEA_LINE_MAX];
 static size_t nmea_len = 0;
 static uint32_t last_tx_ms = 0;
+static uint32_t last_tx_ok_ms = 0;
 static lep_full_hdr_t last_hdr {};
 static bool have_fix = false;
 static uint8_t device_id[8] = {0, 0, 0, 0, 0, 0, 0, 1};
@@ -63,9 +65,15 @@ static bool build_and_send(const lep_full_hdr_t *hdr) {
   if (nm == 0) {
     return false;
   }
+  const uint32_t now = millis();
+  const uint32_t min_gap = duty_min_gap_ms(nm);
+  if (last_tx_ok_ms != 0 && (uint32_t)(now - last_tx_ok_ms) < min_gap) {
+    return false;
+  }
   if (lora_send(mesh, nm)) {
     Serial.printf("GPS beacon TX ok (%u B mesh, hop=%u)\n", (unsigned)nm, (unsigned)hop);
     print_hex_line(mesh, nm);
+    last_tx_ok_ms = now;
     return true;
   }
   Serial.println("GPS beacon TX failed");
@@ -146,6 +154,8 @@ void gps_beacon_loop(void) {
     last_tx_ms = now;
     build_and_send(&last_hdr);
   }
+  lora_radio_sleep_hint();
+  delay(5);
 }
 
 #else

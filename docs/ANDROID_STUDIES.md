@@ -1,6 +1,6 @@
 # Android: peer map & platform studies
 
-The **peer map** (`web/peer-map`) is wrapped with **[Capacitor 7](https://capacitorjs.com/)** so you can run the same Vite + Leaflet UI inside an **Android WebView**, ship a **debug APK**, and extend toward **native BLE**, **background location**, or **Play distribution** without rewriting the LEP codec (TypeScript lives in `shared/packet` and `shared/mesh`).
+The **peer map** (`web/peer-map`) is wrapped with **[Capacitor](https://capacitorjs.com/)** so you can run the same Vite + Leaflet UI inside an **Android WebView**, ship a **debug APK**, and extend toward **native BLE**, **background location**, or **Play distribution** without rewriting the LEP codec (TypeScript lives in `shared/packet` and `shared/mesh`).
 
 ## What you get today
 

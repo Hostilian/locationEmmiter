@@ -1,6 +1,8 @@
 node_modules/
 dist/
 web/peer-map/dist/
+shared/packet/dist/
+shared/mesh/dist/
 web/peer-map/android/.gradle/
 web/peer-map/android/app/build/
 web/peer-map/android/build/
@@ -8,6 +10,15 @@ web/peer-map/android/capacitor-cordova-android-plugins/build/
 web/peer-map/android/local.properties
 web/peer-map/android/.idea/
 web/peer-map/android/*.iml
+# Gradle caches inside nested node_modules (Capacitor packages)
+web/peer-map/node_modules/**/.gradle/
+web/peer-map/node_modules/**/build/
 .pio/
 .vscode/
+.idea/workspace.xml
+.idea/caches/
 *.log
+coverage/
+playwright-report/
+test-results/
+.DS_Store

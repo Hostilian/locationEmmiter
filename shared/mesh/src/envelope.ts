@@ -1,4 +1,9 @@
-import { FLAG_SOS, encodeFull, type LocationEmitterPacketV1 } from '@location-emitter/packet';
+import {
+  FLAG_SOS,
+  LEP_PREFIX_LEN,
+  encodeFull,
+  type LocationEmitterPacketV1,
+} from '@location-emitter/packet';
 
 /** Magic "LRM1" on wire */
 export const MESH_MAGIC = new Uint8Array([0x4c, 0x52, 0x4d, 0x31]);
@@ -30,8 +35,10 @@ export function wrapLepWithMesh(lepWire: Uint8Array, hopRemaining: number, reser
   return out;
 }
 
+const MIN_LEP_WIRE = LEP_PREFIX_LEN + 2; // CRC16 after empty text
+
 export function unwrapMeshFrame(buf: Uint8Array): { hopRemaining: number; reserved: number; lepWire: Uint8Array } | null {
-  if (buf.length < HEADER_LEN + 36) return null;
+  if (buf.length < HEADER_LEN + MIN_LEP_WIRE) return null;
   if (!isMeshMagic(buf)) return null;
   const hopRemaining = buf[4]!;
   const reserved = buf[5]!;

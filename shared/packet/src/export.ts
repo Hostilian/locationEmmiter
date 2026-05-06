@@ -78,3 +78,58 @@ function csvEscape(s: string): string {
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
+
+export type GeoJsonFeatureCollection = {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    id: number;
+    geometry: { type: 'Point'; coordinates: [number, number] };
+    properties: Record<string, unknown>;
+  }>;
+  meta: {
+    exportedAt: string;
+    packetCount: number;
+    uniqueDeviceIds: number;
+    sosCount: number;
+  };
+};
+
+/** GeoJSON FeatureCollection (lon, lat) with summary `meta` (matches peer-map export shape). */
+export function packetsToGeoJson(packets: LocationEmitterPacketV1[]): GeoJsonFeatureCollection {
+  const digit = (b: number) => b.toString(16).padStart(2, '0');
+  const features = packets.map((p, i) => ({
+    type: 'Feature' as const,
+    id: i,
+    geometry: {
+      type: 'Point' as const,
+      coordinates: [p.lonE7 / 1e7, p.latE7 / 1e7] as [number, number],
+    },
+    properties: {
+      unixTime: p.unixTime,
+      altM: p.altM,
+      hAccuracyM: p.hAccuracyM,
+      batteryPct: p.batteryPct,
+      flags: p.flags,
+      sos: (p.flags & FLAG_SOS) !== 0,
+      relayEligible: (p.flags & FLAG_RELAY_ELIGIBLE) !== 0,
+      deviceIdHex: [...p.deviceId].map((x) => digit(x)).join(''),
+      text: p.text,
+    },
+  }));
+  const idStrings = packets.map((p) => [...p.deviceId].map((x) => digit(x)).join(''));
+  return {
+    type: 'FeatureCollection',
+    features,
+    meta: {
+      exportedAt: new Date().toISOString(),
+      packetCount: packets.length,
+      uniqueDeviceIds: new Set(idStrings).size,
+      sosCount: packets.reduce((n, p) => n + ((p.flags & FLAG_SOS) !== 0 ? 1 : 0), 0),
+    },
+  };
+}
+
+export function packetsToGeoJsonText(packets: LocationEmitterPacketV1[], space = 0): string {
+  return JSON.stringify(packetsToGeoJson(packets), null, space > 0 ? space : undefined);
+}

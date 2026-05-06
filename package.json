@@ -7,12 +7,28 @@
   ],
   "scripts": {
     "build": "npm run build -w @location-emitter/packet && npm run build -w @location-emitter/mesh",
-    "test": "npm run build -w @location-emitter/packet && npm run test -w @location-emitter/packet && npm run test -w @location-emitter/mesh",
-    "verify:decode": "npm run build && npm run decode-packet -- -- --quiet 4c47454f0102000000f1536514321f1d04295e0123000c00570001020304050607082aee",
+    "test": "npm run build -w @location-emitter/packet && npm run test -w @location-emitter/packet && npm run test -w @location-emitter/mesh && node --test tools/*.test.mjs",
+    "verify:decode": "npm run build && node tools/verify-decode.mjs",
     "verify:peer-map": "npm --prefix web/peer-map run build",
     "decode-packet": "node tools/decode-packet.mjs",
     "decode-packet-all": "node tools/decode-packet.mjs --all-lines",
     "decode-packet-all-jsonl": "node tools/decode-packet.mjs --all-lines --jsonl",
-    "airtime": "node tools/lora-airtime.mjs"
+    "encode-packet": "node tools/encode-packet.mjs",
+    "airtime": "node tools/lora-airtime.mjs",
+    "lint": "eslint shared web/peer-map/src",
+    "lint:fix": "eslint shared web/peer-map/src --fix",
+    "format": "prettier --write \"shared/**/*.ts\" \"web/peer-map/src/**/*.ts\" \"tools/*.{mjs,js}\"",
+    "typecheck": "npm run typecheck --workspaces --if-present && npm --prefix web/peer-map run typecheck",
+    "clean": "npm run clean --workspaces --if-present && npm --prefix web/peer-map run clean --if-present",
+    "changeset": "changeset",
+    "version-packages": "changeset version"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@eslint/js": "^9.16.0",
+    "eslint": "^9.16.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "typescript-eslint": "^8.18.0"
   }
 }

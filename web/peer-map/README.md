@@ -2,6 +2,13 @@
 
 Vite + Leaflet UI to **decode** LEP / LRM1 hex, **encode** from device GNSS, and export GPX / CSV / GeoJSON. Shared codecs come from `../../shared/packet` and `../../shared/mesh`.
 
+Recent additions:
+
+- PWA service worker (offline shell + cached tiles)
+- Serial / BLE ingest buttons (web APIs)
+- IndexedDB history timeline slider
+- Capacitor plugin set for app/clipboard/filesystem/geolocation/preferences/share + Bluetooth LE
+
 ## Web
 
 ```bash

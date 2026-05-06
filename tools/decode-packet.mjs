@@ -34,7 +34,11 @@ function packetLibVersion() {
 }
 
 function parseHexBytes(source) {
-  const hex = source.replace(/0x/gi, '').replace(/[^0-9a-fA-F]/g, '');
+  const normalized = source.replace(/0x/gi, '');
+  if (/[g-zG-Z]/.test(normalized)) {
+    return { error: 'invalid hex character in input' };
+  }
+  const hex = normalized.replace(/[^0-9a-fA-F]/g, '');
   if (hex.length === 0) {
     return null;
   }
@@ -44,36 +48,50 @@ function parseHexBytes(source) {
   return Uint8Array.from(hex.match(/.{2}/g).map((h) => parseInt(h, 16)));
 }
 
-function packetJson(p) {
-  return {
+function packetJson(p, warnings) {
+  const base = {
     ...p,
     deviceId: Buffer.from(p.deviceId).toString('hex'),
     lat: p.latE7 / 1e7,
     lon: p.lonE7 / 1e7,
   };
+  if (warnings && warnings.length > 0) {
+    base.warnings = warnings;
+  }
+  return base;
 }
 
-/** Decode one frame; mesh or full/BLE short. */
-function decodeOneBuf(buf) {
+/** Decode one frame; mesh or full/BLE short. With `strict`, semantic warnings fail the decode. */
+function decodeOneBuf(buf, strict) {
   if (buf.length >= 6 && buf[0] === 0x4c && buf[1] === 0x52 && buf[2] === 0x4d && buf[3] === 0x31) {
     const u = unwrapMeshFrame(buf);
     if (!u) {
       return { ok: false, transport: 'mesh', error: 'invalid mesh frame' };
     }
     const d = decodeFull(u.lepWire);
+    if (!d.ok) {
+      return { ok: false, transport: 'mesh', hopRemaining: u.hopRemaining, lep: d };
+    }
+    const badStrict = strict && d.warnings.length > 0;
     return {
-      ok: d.ok,
+      ok: !badStrict,
       transport: 'mesh',
       hopRemaining: u.hopRemaining,
-      lep: d.ok ? packetJson(d.packet) : d,
+      lep: badStrict
+        ? { error: 'strict: semantic warnings', warnings: d.warnings }
+        : packetJson(d.packet, d.warnings),
     };
   }
   const d = decodeAny(buf);
+  if (!d.ok) {
+    return { ok: false, transport: 'lep', decode: d };
+  }
+  const badStrict = strict && d.warnings.length > 0;
   return {
-    ok: d.ok,
+    ok: !badStrict,
     transport: 'lep',
-    wire: d.ok ? d.wire : undefined,
-    decode: d.ok ? packetJson(d.packet) : d,
+    wire: d.wire,
+    decode: badStrict ? { error: 'strict: semantic warnings', warnings: d.warnings } : packetJson(d.packet, d.warnings),
   };
 }
 
@@ -86,6 +104,7 @@ function parseCli() {
   let allLines = false;
   let jsonl = false;
   let quiet = false;
+  let strict = false;
   let filePath = null;
   const args = [];
   for (let i = 0; i < raw.length; i++) {
@@ -102,6 +121,10 @@ function parseCli() {
       quiet = true;
       continue;
     }
+    if (a === '--strict') {
+      strict = true;
+      continue;
+    }
     if (a === '--file') {
       const path = raw[++i];
       if (!path) {
@@ -115,7 +138,7 @@ function parseCli() {
 
   if (filePath) {
     try {
-      return { kind: 'text', text: fs.readFileSync(filePath, 'utf8'), allLines, jsonl, quiet };
+      return { kind: 'text', text: fs.readFileSync(filePath, 'utf8'), allLines, jsonl, quiet, strict };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return { kind: 'error', message: `read ${filePath}: ${msg}` };
@@ -123,12 +146,12 @@ function parseCli() {
   }
 
   if (args.length > 0) {
-    return { kind: 'text', text: args.join(' '), allLines, jsonl, quiet };
+    return { kind: 'text', text: args.join(' '), allLines, jsonl, quiet, strict };
   }
   if (process.stdin.isTTY) {
     return { kind: 'empty' };
   }
-  return { kind: 'text', text: fs.readFileSync(0, 'utf8'), allLines, jsonl, quiet };
+  return { kind: 'text', text: fs.readFileSync(0, 'utf8'), allLines, jsonl, quiet, strict };
 }
 
 const argv0 = process.argv.slice(2);
@@ -152,6 +175,7 @@ With --all-lines: each non-empty line is decoded; default JSON is { count, resul
   --quiet / -q: no stdout on success; decode errors go to stderr. With --all-lines, never prints the batch JSON.
   (On Windows PowerShell, prefer --quiet — bare -q can be eaten by the shell.)
   --version / -V / -v: print @location-emitter/packet semver (from shared/packet).
+  --strict: treat semantic decode warnings as failures (exit 3).
 Exit 3 if any line fails to decode.`);
   process.exit(0);
 }
@@ -170,6 +194,8 @@ if (cli.kind === 'text' && cli.jsonl && !cli.allLines) {
   console.error('--jsonl requires --all-lines');
   process.exit(1);
 }
+
+const strict = cli.kind === 'text' ? !!cli.strict : false;
 
 const textRaw = cli.text.trim();
 const lines = textRaw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -192,7 +218,7 @@ if (cli.allLines) {
       worstExit = 3;
       continue;
     }
-    const r = decodeOneBuf(buf);
+    const r = decodeOneBuf(buf, strict);
     results.push({ line: i + 1, ...r });
     if (!r.ok) {
       worstExit = 3;
@@ -225,7 +251,7 @@ if (buf === null || (typeof buf === 'object' && 'error' in buf)) {
   process.exit(1);
 }
 
-const single = decodeOneBuf(buf);
+const single = decodeOneBuf(buf, strict);
 if (single.transport === 'mesh') {
   const s = JSON.stringify(
     { transport: 'mesh', hopRemaining: single.hopRemaining, lep: single.lep },

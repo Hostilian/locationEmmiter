@@ -13,5 +13,5 @@
       "@location-emitter/mesh": ["../../shared/mesh/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "vite.config.ts"]
+  "include": ["src/**/*.ts", "vite.config.ts", "playwright.config.ts", "e2e/**/*.ts"]
 }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
-import { FLAG_RELAY_ELIGIBLE, FLAG_SOS, packetsToCsv, packetsToGpx } from './index.js';
+import {
+  FLAG_RELAY_ELIGIBLE,
+  FLAG_SOS,
+  packetsToCsv,
+  packetsToGeoJson,
+  packetsToGpx,
+} from './index.js';
 import type { LocationEmitterPacketV1 } from './types.js';
 
 const p: LocationEmitterPacketV1 = {
@@ -31,5 +37,14 @@ describe('export', () => {
     expect(csv.split('\n').length).toBe(3);
     expect(csv).toContain('0102030405060708');
     expect(csv).toContain(',1,1,');
+  });
+
+  it('builds GeoJSON FeatureCollection', () => {
+    const gj = packetsToGeoJson([p]);
+    expect(gj.type).toBe('FeatureCollection');
+    expect(gj.features.length).toBe(1);
+    expect(gj.features[0]!.geometry.coordinates[1]).toBeCloseTo(48.85837, 5);
+    expect(gj.meta.packetCount).toBe(1);
+    expect(gj.meta.sosCount).toBe(1);
   });
 });

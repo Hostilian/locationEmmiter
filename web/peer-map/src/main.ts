@@ -4,17 +4,36 @@ import { Capacitor } from '@capacitor/core';
 import L from 'leaflet';
 import {
   BATTERY_UNKNOWN,
-  decodeAny,
-  decodeFull,
   encodeBleShort,
   encodeFull,
   FLAG_RELAY_ELIGIBLE,
   FLAG_SOS,
   packetsToCsv,
+  packetsToGeoJsonText,
   packetsToGpx,
   type LocationEmitterPacketV1,
 } from '@location-emitter/packet';
-import { encodeMeshFromPacket, unwrapMeshFrame } from '@location-emitter/mesh';
+import { encodeMeshFromPacket } from '@location-emitter/mesh';
+import { decodeWireDetailed } from './decodeWire.js';
+import { appendHistoryEntries, clearHistory, loadHistorySorted, type HistoryRow } from './historyStore.js';
+import { startWebBleIngest } from './ingest/ble.js';
+import { startWebSerialIngest } from './ingest/serial.js';
+import { parseHex, toHexSpaced } from './parseHex.js';
+import {
+  LS_THEME,
+  MAX_HEX_FILE_BYTES,
+  MAX_LINK_QUERY_HEX,
+  MAX_URL_HEX_CHARS,
+  SESSION_ENCODE_NOTE,
+  SESSION_ENCODE_RELAY,
+  SESSION_ENCODE_SOS,
+  SESSION_HEX,
+  SESSION_MAP_VIEW,
+  SESSION_OUT_BLE,
+  SESSION_OUT_FULL,
+  SESSION_OUT_MESH,
+  STORAGE_DEVICE_ID,
+} from './storageKeys.js';
 
 const hexEl = document.querySelector<HTMLTextAreaElement>('#hex')!;
 const goEl = document.querySelector<HTMLButtonElement>('#go')!;
@@ -29,7 +48,7 @@ const copyPlottedHexEl = document.querySelector<HTMLButtonElement>('#copy-plotte
 const exportGpxEl = document.querySelector<HTMLButtonElement>('#export-gpx')!;
 const exportCsvEl = document.querySelector<HTMLButtonElement>('#export-csv')!;
 const exportGeojsonEl = document.querySelector<HTMLButtonElement>('#export-geojson')!;
-const netOfflineEl = document.querySelector<HTMLDivElement>('#net-offline')!;
+const netOfflineEl = document.querySelector<HTMLOutputElement>('#net-offline')!;
 const themeSystemEl = document.querySelector<HTMLButtonElement>('#theme-system')!;
 const themeLightEl = document.querySelector<HTMLButtonElement>('#theme-light')!;
 const themeDarkEl = document.querySelector<HTMLButtonElement>('#theme-dark')!;
@@ -58,29 +77,63 @@ const sampleHexEl = document.querySelector<HTMLButtonElement>('#sample-hex')!;
 const loadHexFileEl = document.querySelector<HTMLButtonElement>('#load-hex-file')!;
 const pasteHexClipboardEl = document.querySelector<HTMLButtonElement>('#paste-hex-clipboard')!;
 const decodeDetailEl = document.querySelector<HTMLPreElement>('#decode-detail')!;
+const historySliderEl = document.querySelector<HTMLInputElement>('#history-slider');
+const historyClearEl = document.querySelector<HTMLButtonElement>('#history-clear');
+const serialConnectEl = document.querySelector<HTMLButtonElement>('#serial-connect');
+const serialDisconnectEl = document.querySelector<HTMLButtonElement>('#serial-disconnect');
+const bleConnectEl = document.querySelector<HTMLButtonElement>('#ble-connect');
+const bleDisconnectEl = document.querySelector<HTMLButtonElement>('#ble-disconnect');
+const ingestStatusEl = document.querySelector<HTMLParagraphElement>('#ingest-status');
 
-const STORAGE_DEVICE_ID = 'lep-peer-map-device-id-v1';
-
-const SESSION_HEX = 'lep-peer-map-session-hex';
-const SESSION_ENCODE_NOTE = 'lep-peer-map-session-encode-note';
-const SESSION_ENCODE_SOS = 'lep-peer-map-session-encode-sos';
-const SESSION_ENCODE_RELAY = 'lep-peer-map-session-encode-relay';
-const SESSION_MAP_VIEW = 'lep-peer-map-session-map-view-v1';
-const SESSION_OUT_FULL = 'lep-peer-map-session-out-full';
-const SESSION_OUT_BLE = 'lep-peer-map-session-out-ble';
-const SESSION_OUT_MESH = 'lep-peer-map-session-out-mesh';
-
-const LS_THEME = 'lep-peer-map-theme';
 type ThemePref = 'system' | 'light' | 'dark';
 
-/** Text file size limit for “Load file” (avoids freezing the UI on huge dumps). */
-const MAX_HEX_FILE_BYTES = 1_500_000;
+let historyRows: HistoryRow[] = [];
+let serialIngest: Awaited<ReturnType<typeof startWebSerialIngest>> | null = null;
+let bleIngest: Awaited<ReturnType<typeof startWebBleIngest>> | null = null;
+let serialTimer: ReturnType<typeof setInterval> | undefined;
+let ingestDecodeTimer: ReturnType<typeof setTimeout> | undefined;
 
-/** Max characters for ?hex= / #hex= bootstrap (avoids huge URLs locking the UI). */
-const MAX_URL_HEX_CHARS = 100_000;
+function safeSessionSet(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+}
 
-/** Prefer query string for short hex; longer payloads use #hex= (still capped by MAX_URL_HEX_CHARS). */
-const MAX_LINK_QUERY_HEX = 1800;
+function safeSessionRemove(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+function safeLocalSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+}
+
+function formatIngestError(kind: 'serial' | 'ble', error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error);
+  const lower = text.toLowerCase();
+  if (lower.includes('notfounderror') || lower.includes('no device')) {
+    return kind === 'serial'
+      ? 'No serial device selected. Connect a device and try again.'
+      : 'No BLE device selected. Choose a device and try again.';
+  }
+  if (lower.includes('notallowed') || lower.includes('permission')) {
+    return kind === 'serial'
+      ? 'Serial permission was denied. Allow access and try again.'
+      : 'Bluetooth permission was denied. Allow access and try again.';
+  }
+  return kind === 'serial'
+    ? `Serial connection failed: ${text}`
+    : `BLE connection failed: ${text}`;
+}
 
 const map = L.map('map', {
   zoomControl: true,
@@ -122,7 +175,7 @@ const tileDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}
   attribution: '&copy; OpenStreetMap &copy; CARTO',
 });
 
-const colorSchemeMq = window.matchMedia('(prefers-color-scheme: dark)');
+const colorSchemeMq = globalThis.matchMedia('(prefers-color-scheme: dark)');
 let activeBasemap: L.TileLayer = tileLight;
 
 function getThemePref(): ThemePref {
@@ -150,12 +203,17 @@ function applyChromeTheme(): void {
   }
   activeBasemap = dark ? tileDark : tileLight;
   activeBasemap.addTo(map);
-  metaThemeEl.setAttribute('content', dark ? '#121212' : '#1a237e');
+  metaThemeEl.setAttribute('content', dark ? '#10151e' : '#f4f6fb');
   syncDecodePolylineStyle();
 }
 
 function decodePathLineColor(): string {
-  return document.documentElement.classList.contains('theme-dark') ? '#81d4fa' : '#5c6bc0';
+  return document.documentElement.classList.contains('theme-dark') ? '#9db5ff' : '#4f62f0';
+}
+
+function getThemeToken(name: string, fallback: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
 }
 
 /** Keep dashed decode path readable after theme toggle (markers unchanged). */
@@ -170,17 +228,19 @@ function syncDecodePolylineStyle(): void {
 
 function syncThemeButtons(): void {
   const p = getThemePref();
-  themeSystemEl.classList.toggle('is-active', p === 'system');
-  themeLightEl.classList.toggle('is-active', p === 'light');
-  themeDarkEl.classList.toggle('is-active', p === 'dark');
+  const systemActive = p === 'system';
+  const lightActive = p === 'light';
+  const darkActive = p === 'dark';
+  themeSystemEl.classList.toggle('is-active', systemActive);
+  themeLightEl.classList.toggle('is-active', lightActive);
+  themeDarkEl.classList.toggle('is-active', darkActive);
+  themeSystemEl.setAttribute('aria-checked', systemActive ? 'true' : 'false');
+  themeLightEl.setAttribute('aria-checked', lightActive ? 'true' : 'false');
+  themeDarkEl.setAttribute('aria-checked', darkActive ? 'true' : 'false');
 }
 
 function setThemePref(pref: ThemePref): void {
-  try {
-    localStorage.setItem(LS_THEME, pref);
-  } catch {
-    /* ignore */
-  }
+  safeLocalSet(LS_THEME, pref);
   applyChromeTheme();
   syncThemeButtons();
 }
@@ -200,10 +260,6 @@ const decodedPackets: LocationEmitterPacketV1[] = [];
 const lastPlottedHexLines: string[] = [];
 let exportEncodePacket: LocationEmitterPacketV1 | null = null;
 
-function toHexSpaced(buf: Uint8Array): string {
-  return [...buf].map((b) => b.toString(16).padStart(2, '0')).join(' ');
-}
-
 function getOrCreateDeviceId(): Uint8Array {
   try {
     const existing = localStorage.getItem(STORAGE_DEVICE_ID);
@@ -219,58 +275,12 @@ function getOrCreateDeviceId(): Uint8Array {
   }
   const out = new Uint8Array(8);
   crypto.getRandomValues(out);
-  try {
-    localStorage.setItem(STORAGE_DEVICE_ID, toHexSpaced(out).replaceAll(/\s/g, ''));
-  } catch {
-    /* ignore */
-  }
+  safeLocalSet(STORAGE_DEVICE_ID, toHexSpaced(out).replaceAll(/\s/g, ''));
   return out;
 }
 
 const deviceId = getOrCreateDeviceId();
 deviceIdEl.textContent = toHexSpaced(deviceId);
-
-/** Accepts spaces, commas, colons, newlines between hex pairs, or one continuous hex string. */
-function parseHex(s: string): Uint8Array | null {
-  const raw = s.trim();
-  if (!raw) return null;
-  const hexOnly = raw.replaceAll(/0x/gi, '').replaceAll(/[^0-9a-fA-F]/g, '');
-  if (hexOnly.length >= 2 && hexOnly.length % 2 === 0 && /^[0-9a-fA-F]+$/.test(hexOnly)) {
-    const out = new Uint8Array(hexOnly.length / 2);
-    for (let i = 0; i < hexOnly.length; i += 2) {
-      out[i / 2] = Number.parseInt(hexOnly.slice(i, i + 2), 16);
-    }
-    return out;
-  }
-  const parts = raw.replaceAll(/0x/gi, '').split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return null;
-  try {
-    return Uint8Array.from(parts.map((h) => Number.parseInt(h, 16)));
-  } catch {
-    return null;
-  }
-}
-
-function decodeWireDetailed(
-  buf: Uint8Array,
-): { ok: true; packet: LocationEmitterPacketV1; label: string } | { ok: false; reason: string } {
-  if (
-    buf.length >= 6 &&
-    buf[0] === 0x4c &&
-    buf[1] === 0x52 &&
-    buf[2] === 0x4d &&
-    buf[3] === 0x31
-  ) {
-    const u = unwrapMeshFrame(buf);
-    if (!u) return { ok: false, reason: 'mesh frame too short or malformed LRM1 wrapper' };
-    const d = decodeFull(u.lepWire);
-    if (!d.ok) return { ok: false, reason: `inner LEP: ${d.error}` };
-    return { ok: true, packet: d.packet, label: `mesh hop=${u.hopRemaining}` };
-  }
-  const d = decodeAny(buf);
-  if (!d.ok) return { ok: false, reason: d.error };
-  return { ok: true, packet: d.packet, label: d.wire };
-}
 
 function plot(
   p: LocationEmitterPacketV1,
@@ -284,8 +294,8 @@ function plot(
   const sos = (p.flags & FLAG_SOS) !== 0;
   const id = [...p.deviceId].map((b) => b.toString(16).padStart(2, '0')).join('');
   const title = `${sos ? 'SOS ' : ''}${id.slice(0, 8)}…`;
-  const color = sos ? '#c62828' : `hsl(${hue % 360} 70% 40%)`;
-  const fill = sos ? '#ff5252' : `hsl(${hue % 360} 85% 55%)`;
+  const color = sos ? getThemeToken('--sos', '#c52842') : `hsl(${hue % 360} 70% 40%)`;
+  const fill = sos ? getThemeToken('--sos-soft', '#ff6179') : `hsl(${hue % 360} 85% 55%)`;
   const m = L.circleMarker([lat, lon], {
     radius: sos ? 12 : 8,
     color,
@@ -372,9 +382,10 @@ function buildDecodeShareUrl(): string | null {
 
 function syncShareLinkButton(): void {
   const url = buildDecodeShareUrl();
-  copyShareLinkEl.disabled = url == null;
+  const hasUrl = url !== null;
+  copyShareLinkEl.disabled = !hasUrl;
   copyShareLinkEl.title =
-    url == null
+    !hasUrl
       ? 'Add hex (under length limit) to build a shareable link'
       : 'Copy URL that opens this hex in the map';
 }
@@ -389,40 +400,130 @@ function updateExportButtons(): void {
   updateDecodeStats();
 }
 
+function plotHistorySlice(upToIdx: number): void {
+  decodeLayer.clearLayers();
+  decodedPackets.length = 0;
+  lastPlottedHexLines.length = 0;
+  const n = Math.min(upToIdx + 1, historyRows.length);
+  const slice = historyRows.slice(0, n);
+  const bounds: L.LatLngTuple[] = [];
+  let hue = 0;
+  for (const row of slice) {
+    plot(row.packet, `history · ${new Date(row.packet.unixTime * 1000).toISOString()}`, bounds, hue);
+    hue += 47;
+    decodedPackets.push(row.packet);
+    lastPlottedHexLines.push(row.sourceLine);
+  }
+  if (bounds.length >= 2) {
+    L.polyline(bounds, {
+      color: decodePathLineColor(),
+      weight: 2,
+      dashArray: '6 10',
+      opacity: 0.55,
+      interactive: false,
+    }).addTo(decodeLayer);
+  }
+  updateExportButtons();
+  invalidateMapSize();
+}
+
+async function refreshHistoryUi(): Promise<void> {
+  if (!historySliderEl) return;
+  try {
+    historyRows = await loadHistorySorted();
+  } catch {
+    historyRows = [];
+  }
+  const max = Math.max(0, historyRows.length - 1);
+  historySliderEl.max = String(max);
+  historySliderEl.value = String(max);
+  historySliderEl.disabled = historyRows.length === 0;
+}
+
+historySliderEl?.addEventListener('input', () => {
+  const v = Number(historySliderEl?.value ?? '0');
+  plotHistorySlice(v);
+});
+
+historyClearEl?.addEventListener('click', () => {
+  void (async () => {
+    await clearHistory();
+    await refreshHistoryUi();
+    decodeLayer.clearLayers();
+    decodedPackets.length = 0;
+    lastPlottedHexLines.length = 0;
+    updateExportButtons();
+  })();
+});
+
+serialConnectEl?.addEventListener('click', () => {
+  void (async () => {
+    try {
+      if (ingestStatusEl) ingestStatusEl.textContent = 'Opening serial connection…';
+      serialIngest = await startWebSerialIngest((line) => {
+        appendIncomingLineAndDecode(line);
+      });
+      if (serialConnectEl) serialConnectEl.disabled = true;
+      if (serialDisconnectEl) serialDisconnectEl.disabled = false;
+      serialTimer = setInterval(() => {
+        if (serialIngest && ingestStatusEl) {
+          ingestStatusEl.textContent = `Serial connected · ${serialIngest.linesRx} lines received`;
+        }
+      }, 900);
+    } catch (e) {
+      if (ingestStatusEl) {
+        ingestStatusEl.textContent = formatIngestError('serial', e);
+      }
+    }
+  })();
+});
+
+serialDisconnectEl?.addEventListener('click', () => {
+  void (async () => {
+    if (serialTimer) clearInterval(serialTimer);
+    serialTimer = undefined;
+    if (ingestDecodeTimer) clearTimeout(ingestDecodeTimer);
+    ingestDecodeTimer = undefined;
+    if (serialIngest) await serialIngest.close();
+    serialIngest = null;
+    if (serialConnectEl) serialConnectEl.disabled = false;
+    if (serialDisconnectEl) serialDisconnectEl.disabled = true;
+    if (ingestStatusEl) ingestStatusEl.textContent = '';
+  })();
+});
+
+bleConnectEl?.addEventListener('click', () => {
+  void (async () => {
+    try {
+      if (ingestStatusEl) ingestStatusEl.textContent = 'Connecting BLE receiver…';
+      bleIngest = await startWebBleIngest((line) => {
+        appendIncomingLineAndDecode(line);
+      });
+      if (bleConnectEl) bleConnectEl.disabled = true;
+      if (bleDisconnectEl) bleDisconnectEl.disabled = false;
+    } catch (e) {
+      if (ingestStatusEl) {
+        ingestStatusEl.textContent = formatIngestError('ble', e);
+      }
+    }
+  })();
+});
+
+bleDisconnectEl?.addEventListener('click', () => {
+  void (async () => {
+    if (ingestDecodeTimer) clearTimeout(ingestDecodeTimer);
+    ingestDecodeTimer = undefined;
+    if (bleIngest) await bleIngest.disconnect();
+    bleIngest = null;
+    if (bleConnectEl) bleConnectEl.disabled = false;
+    if (bleDisconnectEl) bleDisconnectEl.disabled = true;
+    if (ingestStatusEl) ingestStatusEl.textContent = '';
+  })();
+});
+
 function exportFilename(ext: string): string {
   const t = new Date().toISOString().slice(0, 19).replaceAll('T', '-').replaceAll(':', '');
   return `location-emitter-map-${t}.${ext}`;
-}
-
-function packetsToGeoJsonText(packets: LocationEmitterPacketV1[]): string {
-  const digit = (b: number) => b.toString(16).padStart(2, '0');
-  const features = packets.map((p, i) => ({
-    type: 'Feature' as const,
-    id: i,
-    geometry: {
-      type: 'Point' as const,
-      coordinates: [p.lonE7 / 1e7, p.latE7 / 1e7],
-    },
-    properties: {
-      unixTime: p.unixTime,
-      altM: p.altM,
-      hAccuracyM: p.hAccuracyM,
-      batteryPct: p.batteryPct,
-      flags: p.flags,
-      sos: (p.flags & FLAG_SOS) !== 0,
-      relayEligible: (p.flags & FLAG_RELAY_ELIGIBLE) !== 0,
-      deviceIdHex: [...p.deviceId].map((x) => digit(x)).join(''),
-      text: p.text,
-    },
-  }));
-  const idStrings = packets.map((p) => [...p.deviceId].map((x) => digit(x)).join(''));
-  const meta = {
-    exportedAt: new Date().toISOString(),
-    packetCount: packets.length,
-    uniqueDeviceIds: new Set(idStrings).size,
-    sosCount: packets.reduce((n, p) => n + ((p.flags & FLAG_SOS) !== 0 ? 1 : 0), 0),
-  };
-  return JSON.stringify({ type: 'FeatureCollection', features, meta });
 }
 
 function downloadText(filename: string, mime: string, text: string): void {
@@ -449,13 +550,13 @@ async function shareOrDownload(
     const file = new File([text], filename, { type: mime });
     if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: filename });
-      encodeStatusEl.textContent = `${statusMsg} Shared via system sheet.`;
+      encodeStatusEl.textContent = `${statusMsg} Shared using your device share sheet.`;
       tapVibrate();
       return;
     }
   } catch (e) {
     if (e instanceof Error && e.name === 'AbortError') {
-      encodeStatusEl.textContent = 'Share cancelled.';
+      encodeStatusEl.textContent = 'Share canceled.';
       return;
     }
   }
@@ -471,12 +572,20 @@ function fitAllMarkers(): void {
     map.fitBounds(b, { padding: [52, 52], maxZoom: 16 });
     tapVibrate();
   } else {
-    encodeStatusEl.textContent = 'No markers to fit.';
+    encodeStatusEl.textContent = 'No markers available to fit yet.';
   }
   invalidateMapSize();
 }
 
-function runDecode(): void {
+type DecodeRunResult = {
+  lines: string[];
+  bounds: L.LatLngTuple[];
+  badHexLines: number[];
+  badDecodeDetails: { line: number; reason: string }[];
+  lastMarker: L.CircleMarker | null;
+};
+
+function resetDecodeUiBeforeRun(): void {
   errEl.textContent = '';
   decodeOkEl.textContent = '';
   decodeDetailEl.textContent = '';
@@ -484,21 +593,38 @@ function runDecode(): void {
   decodeLayer.clearLayers();
   decodedPackets.length = 0;
   lastPlottedHexLines.length = 0;
-  const lines = hexEl.value
+}
+
+function decodeInputLines(): string[] {
+  return hexEl.value
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
-  if (lines.length === 0) {
-    errEl.textContent = 'Paste one or more hex lines.';
-    updateExportButtons();
-    return;
-  }
+}
+
+function appendIncomingLineAndDecode(line: string): void {
+  const cur = hexEl.value.trimEnd();
+  hexEl.value = cur ? `${cur}\n${line}` : line;
+  scheduleIngestDecode();
+}
+
+function scheduleIngestDecode(): void {
+  if (ingestDecodeTimer) return;
+  ingestDecodeTimer = setTimeout(() => {
+    ingestDecodeTimer = undefined;
+    runDecode();
+  }, 120);
+}
+
+function decodeAndPlotLines(lines: string[]): DecodeRunResult {
   const bounds: L.LatLngTuple[] = [];
   const badHexLines: number[] = [];
   const badDecodeDetails: { line: number; reason: string }[] = [];
   let lastMarker: L.CircleMarker | null = null;
   for (let i = 0; i < lines.length; i++) {
-    const buf = parseHex(lines[i]!);
+    const line = lines[i];
+    if (line == null) continue;
+    const buf = parseHex(line);
     if (!buf) {
       badHexLines.push(i + 1);
       continue;
@@ -510,8 +636,12 @@ function runDecode(): void {
     }
     lastMarker = plot(got.packet, `${got.label} (line ${i + 1})`, bounds, i * 47);
     decodedPackets.push(got.packet);
-    lastPlottedHexLines.push(lines[i]!);
+    lastPlottedHexLines.push(line);
   }
+  return { lines, bounds, badHexLines, badDecodeDetails, lastMarker };
+}
+
+function drawDecodePath(bounds: L.LatLngTuple[]): void {
   if (bounds.length >= 2) {
     const path = L.polyline(bounds, {
       color: decodePathLineColor(),
@@ -522,47 +652,90 @@ function runDecode(): void {
     }).addTo(decodeLayer);
     path.bringToBack();
   }
+}
+
+function focusDecodeMap(bounds: L.LatLngTuple[], lastMarker: L.CircleMarker | null): void {
   if (bounds.length === 1) {
-    map.setView(bounds[0]!, 14);
+    const first = bounds[0];
+    if (first) {
+      map.setView(first, 14);
+    }
     queueMicrotask(() => lastMarker?.openPopup());
   } else if (bounds.length > 1) {
     map.fitBounds(L.latLngBounds(bounds), { padding: [48, 48], maxZoom: 15 });
   }
+}
 
+function renderDecodeSummary(bounds: L.LatLngTuple[], linesCount: number, errorCount: number): void {
+  if (bounds.length === 0) return;
+  decodeOkEl.textContent =
+    errorCount === 0
+      ? `Plotted all ${bounds.length} line(s).`
+      : `Plotted ${bounds.length} of ${linesCount} line(s).`;
+  tapVibrate();
+}
+
+function renderDecodeErrors(
+  badHexLines: number[],
+  badDecodeDetails: { line: number; reason: string }[],
+): void {
   const errors = badHexLines.length + badDecodeDetails.length;
-  if (bounds.length > 0) {
-    decodeOkEl.textContent =
-      errors === 0
-        ? `Plotted all ${bounds.length} line(s).`
-        : `Plotted ${bounds.length} of ${lines.length} line(s).`;
-    tapVibrate();
+  if (errors === 0) return;
+  const parts: string[] = [];
+  if (badHexLines.length > 0) {
+    parts.push(`invalid hex (lines ${formatLineList(badHexLines)})`);
   }
+  if (badDecodeDetails.length > 0) {
+    parts.push(
+      `not LEP / mesh (lines ${formatLineList(badDecodeDetails.map((d) => d.line))})`,
+    );
+  }
+  errEl.textContent = parts.join(' · ');
+  const maxDetail = 6;
+  if (badDecodeDetails.length === 0) return;
+  decodeDetailEl.hidden = false;
+  const head = badDecodeDetails.slice(0, maxDetail);
+  const more =
+    badDecodeDetails.length > maxDetail
+      ? `\n… +${badDecodeDetails.length - maxDetail} more line(s)`
+      : '';
+  decodeDetailEl.textContent =
+    head.map((d) => `Line ${d.line}: ${d.reason}`).join('\n') + more;
+}
 
-  if (errors > 0) {
-    const parts: string[] = [];
-    if (badHexLines.length > 0) {
-      parts.push(`invalid hex (lines ${formatLineList(badHexLines)})`);
-    }
-    if (badDecodeDetails.length > 0) {
-      parts.push(
-        `not LEP / mesh (lines ${formatLineList(badDecodeDetails.map((d) => d.line))})`,
-      );
-    }
-    errEl.textContent = parts.join(' · ');
-    const maxDetail = 6;
-    if (badDecodeDetails.length > 0) {
-      decodeDetailEl.hidden = false;
-      const head = badDecodeDetails.slice(0, maxDetail);
-      const more =
-        badDecodeDetails.length > maxDetail
-          ? `\n… +${badDecodeDetails.length - maxDetail} more line(s)`
-          : '';
-      decodeDetailEl.textContent =
-        head.map((d) => `Line ${d.line}: ${d.reason}`).join('\n') + more;
-    }
+function persistDecodeHistory(): void {
+  if (decodedPackets.length > 0) {
+    const hist = decodedPackets.map((packet, j) => ({
+      packet,
+      sourceLine: lastPlottedHexLines[j] ?? '',
+    }));
+    void appendHistoryEntries(hist).then(() => refreshHistoryUi()).catch(() => {});
   }
+}
+
+function runDecode(): void {
+  goEl.setAttribute('aria-busy', 'true');
+  resetDecodeUiBeforeRun();
+  const lines = decodeInputLines();
+  if (lines.length === 0) {
+    errEl.textContent = 'Add at least one hex line to continue.';
+    updateExportButtons();
+    goEl.setAttribute('aria-busy', 'false');
+    return;
+  }
+  const result = decodeAndPlotLines(lines);
+  drawDecodePath(result.bounds);
+  focusDecodeMap(result.bounds, result.lastMarker);
+  renderDecodeSummary(
+    result.bounds,
+    result.lines.length,
+    result.badHexLines.length + result.badDecodeDetails.length,
+  );
+  renderDecodeErrors(result.badHexLines, result.badDecodeDetails);
+  persistDecodeHistory();
   updateExportButtons();
   invalidateMapSize();
+  goEl.setAttribute('aria-busy', 'false');
 }
 
 goEl.addEventListener('click', () => runDecode());
@@ -578,7 +751,7 @@ copyShareLinkEl.addEventListener('click', () => {
         : 'Link copied.';
       tapVibrate();
     } catch {
-      errEl.textContent = 'Could not copy link — copy from the address bar if visible.';
+      errEl.textContent = 'Unable to copy link. You can copy it from the address bar.';
     }
   })();
 });
@@ -589,10 +762,10 @@ copyPlottedHexEl.addEventListener('click', () => {
     if (!t) return;
     try {
       await navigator.clipboard.writeText(t);
-      decodeOkEl.textContent = 'Copied plotted hex lines.';
+      decodeOkEl.textContent = 'Plotted hex lines copied.';
       tapVibrate();
     } catch {
-      errEl.textContent = 'Copy blocked — copy from the hex field manually.';
+      errEl.textContent = 'Copy permission is blocked. Please copy directly from the hex field.';
     }
   })();
 });
@@ -607,11 +780,7 @@ clearDecodeEl.addEventListener('click', () => {
   decodedPackets.length = 0;
   lastPlottedHexLines.length = 0;
   updateExportButtons();
-  try {
-    sessionStorage.removeItem(SESSION_HEX);
-  } catch {
-    /* ignore */
-  }
+  safeSessionRemove(SESSION_HEX);
   invalidateMapSize();
   updateHexLineMeter();
 });
@@ -692,13 +861,9 @@ function updateEncodeTextMeter(): void {
 updateEncodeTextMeter();
 
 function persistEncodeFields(): void {
-  try {
-    sessionStorage.setItem(SESSION_ENCODE_NOTE, encodeTextEl.value);
-    sessionStorage.setItem(SESSION_ENCODE_SOS, encodeSosEl.checked ? '1' : '0');
-    sessionStorage.setItem(SESSION_ENCODE_RELAY, encodeRelayEl.checked ? '1' : '0');
-  } catch {
-    /* ignore */
-  }
+  safeSessionSet(SESSION_ENCODE_NOTE, encodeTextEl.value);
+  safeSessionSet(SESSION_ENCODE_SOS, encodeSosEl.checked ? '1' : '0');
+  safeSessionSet(SESSION_ENCODE_RELAY, encodeRelayEl.checked ? '1' : '0');
 }
 
 encodeTextEl.addEventListener('input', () => {
@@ -713,22 +878,14 @@ hexEl.addEventListener('input', () => {
   updateHexLineMeter();
   clearTimeout(hexSessionTimer);
   hexSessionTimer = setTimeout(() => {
-    try {
-      sessionStorage.setItem(SESSION_HEX, hexEl.value);
-    } catch {
-      /* ignore */
-    }
+    safeSessionSet(SESSION_HEX, hexEl.value);
   }, 400);
 });
 
 function persistWireOutputs(): void {
-  try {
-    sessionStorage.setItem(SESSION_OUT_FULL, outFullEl.value);
-    sessionStorage.setItem(SESSION_OUT_BLE, outBleEl.value);
-    sessionStorage.setItem(SESSION_OUT_MESH, outMeshEl.value);
-  } catch {
-    /* ignore */
-  }
+  safeSessionSet(SESSION_OUT_FULL, outFullEl.value);
+  safeSessionSet(SESSION_OUT_BLE, outBleEl.value);
+  safeSessionSet(SESSION_OUT_MESH, outMeshEl.value);
 }
 
 function restoreSession(): void {
@@ -772,11 +929,7 @@ function buildSampleHexLine(): string {
 sampleHexEl.addEventListener('click', () => {
   hexEl.value = buildSampleHexLine();
   updateHexLineMeter();
-  try {
-    sessionStorage.setItem(SESSION_HEX, hexEl.value);
-  } catch {
-    /* ignore */
-  }
+  safeSessionSet(SESSION_HEX, hexEl.value);
   runDecode();
 });
 
@@ -791,26 +944,22 @@ pasteHexClipboardEl.addEventListener('click', () => {
       const raw = await navigator.clipboard.readText();
       const s = raw.replaceAll('\uFEFF', '').trim();
       if (!s) {
-        errEl.textContent = 'Clipboard is empty.';
+        errEl.textContent = 'Clipboard is empty. Copy hex first, then try again.';
         return;
       }
       const cur = hexEl.value.trimEnd();
       hexEl.value = cur ? `${cur}\n${s}` : s;
       updateHexLineMeter();
-      try {
-        sessionStorage.setItem(SESSION_HEX, hexEl.value);
-      } catch {
-        /* ignore */
-      }
+      safeSessionSet(SESSION_HEX, hexEl.value);
       runDecode();
     } catch (e) {
       const name = e instanceof Error ? e.name : '';
       if (name === 'NotAllowedError') {
         errEl.textContent =
-          'Clipboard read blocked — allow permission in the browser / app settings, or paste into the hex field manually.';
+          'Clipboard access is blocked. Allow clipboard permission in browser/app settings, or paste into the hex field.';
       } else {
         errEl.textContent =
-          e instanceof Error ? e.message : 'Could not read clipboard. Paste into the hex field manually.';
+          e instanceof Error ? e.message : 'Unable to read clipboard. Paste into the hex field manually.';
       }
     }
   })();
@@ -822,7 +971,7 @@ hexFileEl.addEventListener('change', () => {
     hexFileEl.value = '';
     if (!f) return;
     if (f.size > MAX_HEX_FILE_BYTES) {
-      errEl.textContent = `File too large (${(f.size / (1024 * 1024)).toFixed(1)} MB). Maximum is ${(MAX_HEX_FILE_BYTES / (1024 * 1024)).toFixed(1)} MB.`;
+      errEl.textContent = `File is too large (${(f.size / (1024 * 1024)).toFixed(1)} MB). Maximum supported size is ${(MAX_HEX_FILE_BYTES / (1024 * 1024)).toFixed(1)} MB.`;
       decodeDetailEl.hidden = true;
       decodeDetailEl.textContent = '';
       return;
@@ -830,19 +979,10 @@ hexFileEl.addEventListener('change', () => {
     const text = await f.text();
     hexEl.value = text.replaceAll('\uFEFF', '').trimEnd();
     updateHexLineMeter();
-    try {
-      sessionStorage.setItem(SESSION_HEX, hexEl.value);
-    } catch {
-      /* ignore */
-    }
+    safeSessionSet(SESSION_HEX, hexEl.value);
     runDecode();
   })();
 });
-
-restoreSession();
-syncThemeButtons();
-updateExportButtons();
-updateHexLineMeter();
 
 /** Prefill from ?hex=… or #hex=… (e.g. shared link). Runs after session restore so URL wins. */
 function bootstrapDecodeFromUrl(): void {
@@ -852,34 +992,28 @@ function bootstrapDecodeFromUrl(): void {
     if (raw == null && u.hash.startsWith('#hex=')) {
       raw = decodeURIComponent(u.hash.slice(5));
     }
-    if (raw == null || !raw.trim()) {
+    if (!raw?.trim()) {
       return;
     }
     const t = raw.trim();
     if (t.length > MAX_URL_HEX_CHARS) {
-      errEl.textContent = `URL hex exceeds ${MAX_URL_HEX_CHARS} characters — paste manually or use Load file.`;
+      errEl.textContent = `URL hex is over ${MAX_URL_HEX_CHARS} characters. Paste manually or use Load file.`;
       return;
     }
     hexEl.value = t;
     updateHexLineMeter();
-    try {
-      sessionStorage.setItem(SESSION_HEX, hexEl.value);
-    } catch {
-      /* ignore */
-    }
+    safeSessionSet(SESSION_HEX, hexEl.value);
     runDecode();
   } catch {
     /* ignore malformed URLs */
   }
 }
 
-bootstrapDecodeFromUrl();
-
 function urlHasDecodeHexParam(): boolean {
   try {
     const u = new URL(globalThis.location.href);
     const q = u.searchParams.get('hex');
-    if (q != null && q.trim()) {
+    if (q?.trim()) {
       return true;
     }
     if (u.hash.startsWith('#hex=')) {
@@ -919,9 +1053,6 @@ function restoreSessionMapViewIfIdle(): void {
   }
 }
 
-restoreSessionMapViewIfIdle();
-queueMicrotask(() => invalidateMapSize());
-
 const capacitorHintEl = document.querySelector<HTMLParagraphElement>('#capacitor-hint');
 if (capacitorHintEl && Capacitor.getPlatform() === 'android') {
   capacitorHintEl.hidden = false;
@@ -942,6 +1073,20 @@ function hookMapResizeOnForeground(): void {
 }
 
 hookMapResizeOnForeground();
+
+function setGlobalRuntimeError(message: string): void {
+  errEl.textContent = message;
+}
+
+globalThis.addEventListener('error', (event) => {
+  const message = event.message || 'Unexpected runtime error occurred.';
+  setGlobalRuntimeError(`Runtime error: ${message}`);
+});
+
+globalThis.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason instanceof Error ? event.reason.message : String(event.reason);
+  setGlobalRuntimeError(`Unhandled async error: ${reason}`);
+});
 
 type NavigatorWithBattery = Navigator & {
   getBattery?: () => Promise<{ level: number }>;
@@ -964,15 +1109,15 @@ function latLonToE7(n: number): number {
 
 function formatGeoError(geoErr: GeolocationPositionError): string {
   if (geoErr.code === 1) {
-    return 'Location permission denied. Allow location for this app in system settings.';
+    return 'Location permission denied. Allow location access for this app in system settings.';
   }
   if (geoErr.code === 2) {
-    return 'Position unavailable.';
+    return 'Location fix unavailable right now.';
   }
   if (geoErr.code === 3) {
-    return 'Location request timed out.';
+    return 'Location request timed out. Please try again.';
   }
-  return geoErr.message || 'Geolocation failed.';
+  return geoErr.message || 'Location request failed.';
 }
 
 function setEncodeSummary(p: LocationEmitterPacketV1): void {
@@ -1017,12 +1162,12 @@ encodeLocateEl.addEventListener('click', () => {
   const text = encodeTextEl.value;
   const te = new TextEncoder();
   if (te.encode(text).length > 32) {
-    encodeErrEl.textContent = 'Note exceeds 32 UTF-8 bytes.';
+    encodeErrEl.textContent = 'Note is over the 32-byte UTF-8 limit.';
     return;
   }
 
   encodeLocateEl.disabled = true;
-  encodeStatusEl.textContent = 'Requesting location…';
+  encodeStatusEl.textContent = 'Requesting secure location fix…';
 
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
@@ -1061,10 +1206,10 @@ encodeLocateEl.addEventListener('click', () => {
         encodePlotEl.disabled = false;
         setEncodeSummary(packet);
         persistWireOutputs();
-        encodeStatusEl.textContent = `Encoded fix · ±${hAccuracyM} m (horizontal accuracy)`;
+        encodeStatusEl.textContent = `Location encoded successfully · horizontal accuracy ±${hAccuracyM} m`;
         tapVibrate();
       } catch (e) {
-        encodeErrEl.textContent = e instanceof Error ? e.message : 'Encode failed.';
+        encodeErrEl.textContent = e instanceof Error ? e.message : 'Encoding failed. Please try again.';
       }
     },
     (geoErr) => {
@@ -1087,8 +1232,8 @@ encodePlotEl.addEventListener('click', () => {
   const sos = (lastEncoded.flags & FLAG_SOS) !== 0;
   const id = [...lastEncoded.deviceId].map((b) => b.toString(16).padStart(2, '0')).join('');
   const title = `${sos ? 'SOS ' : ''}${id.slice(0, 8)}…`;
-  const color = sos ? '#c62828' : '#1565c0';
-  const fill = sos ? '#ff5252' : '#42a5f5';
+  const color = sos ? getThemeToken('--sos', '#c52842') : '#0f75c9';
+  const fill = sos ? getThemeToken('--sos-soft', '#ff6179') : '#52b4ff';
   const m = L.circleMarker([lat, lon], {
     radius: sos ? 14 : 10,
     color,
@@ -1101,11 +1246,14 @@ encodePlotEl.addEventListener('click', () => {
   );
   m.addTo(encodeLayer);
   exportEncodePacket = lastEncoded;
-  map.setView(bounds[0]!, 15);
+  const first = bounds[0];
+  if (first) {
+    map.setView(first, 15);
+  }
   queueMicrotask(() => m.openPopup());
   tapVibrate();
   updateExportButtons();
-  encodeStatusEl.textContent = 'Encode pin on map — included in GPX/CSV export.';
+  encodeStatusEl.textContent = 'Encode marker placed on map and included in exports.';
   invalidateMapSize();
 });
 
@@ -1115,33 +1263,33 @@ async function copyText(text: string, okMsg: string): Promise<void> {
     await navigator.clipboard.writeText(text);
     encodeStatusEl.textContent = okMsg;
   } catch {
-    encodeStatusEl.textContent = 'Copy blocked — select the field and copy manually.';
+    encodeStatusEl.textContent = 'Copy permission is blocked. Select the field and copy manually.';
   }
 }
 
-copyFullEl.addEventListener('click', () => copyText(outFullEl.value, 'Copied full LEP.'));
-copyBleEl.addEventListener('click', () => copyText(outBleEl.value, 'Copied BLE short.'));
-copyMeshEl.addEventListener('click', () => copyText(outMeshEl.value, 'Copied mesh frame.'));
+copyFullEl.addEventListener('click', () => copyText(outFullEl.value, 'Full LEP copied.'));
+copyBleEl.addEventListener('click', () => copyText(outBleEl.value, 'BLE short frame copied.'));
+copyMeshEl.addEventListener('click', () => copyText(outMeshEl.value, 'Mesh frame copied.'));
 
 copyAllWiresEl.addEventListener('click', () => {
   const a = outFullEl.value.trim();
   const b = outBleEl.value.trim();
   const c = outMeshEl.value.trim();
   if (!a && !b && !c) return;
-  void copyText([a, b, c].filter(Boolean).join('\n'), 'Copied all three wires (line-separated).');
+  void copyText([a, b, c].filter(Boolean).join('\n'), 'All three wire formats copied (line-separated).');
 });
 
 meshToDecodeEl.addEventListener('click', () => {
   const mesh = outMeshEl.value.trim();
   if (!mesh) {
-    encodeStatusEl.textContent = 'Encode a mesh frame first.';
+    encodeStatusEl.textContent = 'Create a mesh frame first, then send it to Decode.';
     return;
   }
   const cur = hexEl.value.trim();
   hexEl.value = cur ? `${cur}\n${mesh}` : mesh;
   hexEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   runDecode();
-  encodeStatusEl.textContent = 'Mesh line added to Decode — plotted.';
+  encodeStatusEl.textContent = 'Mesh line sent to Decode and plotted.';
 });
 
 exportGpxEl.addEventListener('click', () => {
@@ -1188,11 +1336,11 @@ function syncOnlineBanner(): void {
   netOfflineEl.hidden = navigator.onLine;
 }
 
-window.addEventListener('online', syncOnlineBanner);
-window.addEventListener('offline', syncOnlineBanner);
+globalThis.addEventListener('online', syncOnlineBanner);
+globalThis.addEventListener('offline', syncOnlineBanner);
 syncOnlineBanner();
 
-window.addEventListener('resize', invalidateMapSize);
+globalThis.addEventListener('resize', invalidateMapSize);
 if (typeof ResizeObserver !== 'undefined') {
   const wrap = document.querySelector('.map-wrap');
   if (wrap) {
@@ -1202,3 +1350,28 @@ if (typeof ResizeObserver !== 'undefined') {
 }
 
 invalidateMapSize();
+
+async function registerPwa(): Promise<void> {
+  try {
+    const m = await import('virtual:pwa-register');
+    m.registerSW({ immediate: true });
+  } catch {
+    /* PWA optional when vite-plugin-pwa not active */
+  }
+}
+
+async function initializeApp(): Promise<void> {
+  restoreSession();
+  syncThemeButtons();
+  updateExportButtons();
+  updateHexLineMeter();
+  bootstrapDecodeFromUrl();
+  restoreSessionMapViewIfIdle();
+  await refreshHistoryUi();
+  invalidateMapSize();
+  await registerPwa();
+}
+
+void (async () => {
+  await initializeApp();
+})();

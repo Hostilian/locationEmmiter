@@ -21,4 +21,6 @@ bool lora_try_receive(uint8_t *buf, size_t cap, size_t *out_len) {
   return false;
 }
 
+void lora_radio_sleep_hint(void) {}
+
 #endif

@@ -19,6 +19,13 @@ void printHex(const uint8_t *data, size_t len) {
   Serial.println();
 }
 
+void fill_demo_device_id(uint8_t out[8]) {
+  const uint64_t mac = ESP.getEfuseMac();
+  for (int i = 0; i < 8; i++) {
+    out[i] = (uint8_t)(mac >> (i * 8));
+  }
+}
+
 } // namespace
 
 #if defined(LEP_RECEIVER) && LEP_RECEIVER
@@ -81,11 +88,15 @@ void loop() {
 
 #else
 
+#ifndef LEP_DEMO_TX
+#define LEP_DEMO_TX 0
+#endif
+
 void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println("location-emitter: LEP v1 + mesh wrapper (LoRa optional — env esp32dev_lora / tbeam_lora)");
-
+#if LEP_DEMO_TX
   lep_full_hdr_t hdr{};
   hdr.flags = static_cast<uint8_t>(LEP_FLAG_SOS | LEP_FLAG_RELAY_ELIGIBLE);
   hdr.unix_time = 1700000000ul;
@@ -94,7 +105,8 @@ void setup() {
   hdr.alt_m = 35;
   hdr.h_accuracy_m = 12;
   hdr.battery_pct = 87;
-  const uint8_t did[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+  uint8_t did[8];
+  fill_demo_device_id(did);
   memcpy(hdr.device_id, did, sizeof(did));
 
   uint8_t full[80];
@@ -137,6 +149,9 @@ void setup() {
   Serial.print(nb);
   Serial.println(" bytes):");
   printHex(ble, nb);
+#else
+  Serial.println("Demo TX disabled (set -D LEP_DEMO_TX=1 to enable sample beacon output).");
+#endif
 }
 
 void loop() {

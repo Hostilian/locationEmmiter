@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-/** Initialize SX1276 once (safe to call multiple times). */
+/** Initialize LoRa radio once (safe to call multiple times). */
 bool lora_radio_ensure_init(void);
 
 /** TX raw bytes on LoRa when `LEP_HAS_LORA=1`; stub returns false otherwise. */
@@ -19,6 +19,9 @@ bool lora_send(const uint8_t *data, size_t len);
  * On success, sets `*out_len` to payload length. Stub returns false when no radio.
  */
 bool lora_try_receive(uint8_t *buf, size_t cap, size_t *out_len);
+
+/** Optional power-save hint; no-op when unsupported/stubbed. */
+void lora_radio_sleep_hint(void);
 
 #ifdef __cplusplus
 }

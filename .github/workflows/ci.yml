@@ -5,17 +5,45 @@ on:
     branches: [main, master]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
   root:
+    strategy:
+      matrix:
+        node: [20, 22]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
       - run: npm test
       - run: npm run verify:decode
 
@@ -28,8 +56,88 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: web/peer-map/package-lock.json
       - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
       - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: peer-map-dist
+          path: web/peer-map/dist
+
+  peer-map-e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/peer-map
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/peer-map/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: peer-map-playwright-report
+          path: web/peer-map/playwright-report
+
+  firmware-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware/esp32-lora
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/esp32-lora/platformio.ini') }}
+      - run: pip install platformio
+      - run: pio run -e esp32dev -e tbeam_lora -e tbeam_sx1262_lora -e heltec_v3_lora -e tbeam_sx1262_gps
+
+  android-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/peer-map/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('web/peer-map/android/**/*.gradle*', 'web/peer-map/android/gradle/wrapper/gradle-wrapper.properties') }}
+      - run: ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: web/peer-map/android/app/build/outputs/apk/debug/app-debug.apk
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    needs: [backend, root, peer-map, peer-map-e2e, firmware-build, android-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            peer-map-dist/**
+            android-debug-apk/**

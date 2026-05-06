@@ -25,8 +25,34 @@ function readI16LE(dv: DataView, o: number) {
   return dv.getInt16(o, true);
 }
 
+/** Bits 3–7 of the flags byte are reserved in LEP v1 (see spec). */
+const RESERVED_FLAG_BITS_MASK = 0xf8;
+
+function collectSemanticWarnings(
+  packet: LocationEmitterPacketV1,
+  flagsRaw: number,
+): string[] {
+  const w: string[] = [];
+  if (packet.unixTime === 0) {
+    w.push('unix_time is zero');
+  }
+  if (packet.latE7 === 0 && packet.lonE7 === 0) {
+    w.push('latitude and longitude are both zero (unknown position signal)');
+  }
+  if (packet.latE7 < -900_000_000 || packet.latE7 > 900_000_000) {
+    w.push('latitude out of plausible range for degrees×1e7');
+  }
+  if (packet.lonE7 < -1_800_000_000 || packet.lonE7 > 1_800_000_000) {
+    w.push('longitude out of plausible range for degrees×1e7');
+  }
+  if ((flagsRaw & RESERVED_FLAG_BITS_MASK) !== 0) {
+    w.push('reserved flag bits (3–7) are set');
+  }
+  return w;
+}
+
 export type DecodeResult =
-  | { ok: true; packet: LocationEmitterPacketV1; wire: 'full' | 'ble_short' }
+  | { ok: true; packet: LocationEmitterPacketV1; wire: 'full' | 'ble_short'; warnings: string[] }
   | { ok: false; error: string };
 
 export function decodeFull(buf: Uint8Array): DecodeResult {
@@ -45,6 +71,7 @@ export function decodeFull(buf: Uint8Array): DecodeResult {
   if (textLen > LEP_TEXT_MAX) return { ok: false, error: 'text_len out of range' };
   const expect = LEP_PREFIX_LEN + textLen + 2;
   if (buf.length < expect) return { ok: false, error: 'truncated packet' };
+  if (buf.length !== expect) return { ok: false, error: 'unexpected trailing bytes' };
 
   const body = buf.subarray(0, LEP_PREFIX_LEN + textLen);
   const crcWant = readU16LE(dv, LEP_PREFIX_LEN + textLen);
@@ -67,7 +94,7 @@ export function decodeFull(buf: Uint8Array): DecodeResult {
     deviceId: Uint8Array.from(deviceId),
     text,
   };
-  return { ok: true, packet, wire: 'full' };
+  return { ok: true, packet, wire: 'full', warnings: collectSemanticWarnings(packet, flags) };
 }
 
 export function decodeBleShort(buf: Uint8Array): DecodeResult {
@@ -102,7 +129,7 @@ export function decodeBleShort(buf: Uint8Array): DecodeResult {
     deviceId: dev,
     text: '',
   };
-  return { ok: true, packet, wire: 'ble_short' };
+  return { ok: true, packet, wire: 'ble_short', warnings: collectSemanticWarnings(packet, flags) };
 }
 
 const MIN_FULL = LEP_PREFIX_LEN + 2; // text_len == 0

@@ -30,9 +30,14 @@ npm run test
 npm run build
 ```
 
+## Operational runbooks
+
+- Release + rollback + incident handling: [docs/RUNBOOK_RELEASE_AND_INCIDENTS.md](docs/RUNBOOK_RELEASE_AND_INCIDENTS.md)
+- Security disclosure process: [SECURITY.md](SECURITY.md)
+
 ## Quick start (packet + mesh)
 
-- **Packet:** `shared/packet` — `encodeFull`, `encodeBleShort`, `decodeAny`, `packetsToGpx`, `packetsToCsv`, `lastKnownByDevice`.
+- **Packet:** `shared/packet` — `encodeFull`, `encodeBleShort`, `decodeAny`, `packetsToGpx`, `packetsToCsv`, `packetsToGeoJson`, `lastKnownByDevice`.
 - **Mesh relay:** `shared/mesh` — `wrapLepWithMesh`, `encodeMeshFromPacket`, `RelayEngine` (hops, dedupe, rate limits). Spec: [docs/MESH_FRAME.md](docs/MESH_FRAME.md).
 
 ## Decode hex (CLI)
@@ -42,9 +47,10 @@ npm run build
 npm run decode-packet -- -- 4C 52 4D 31 ...
 npm run decode-packet-all -- -- --file path/to/log.txt
 npm run decode-packet-all-jsonl -- -- --file path/to/log.txt
+npm run encode-packet -- --lat 48.85837 --lon 2.29481 --relay --mesh-only
 ```
 
-Hex can be a single run of digits (no spaces) or piped/redirected into stdin when it is not a TTY. Use **`--file path`** to read from a file (first non-empty line if there are several, unless **`--all-lines`** / **`-a`** decodes every line into one JSON report). Root scripts: **`npm run decode-packet`**, **`npm run decode-packet-all`** (pass **`-- --`** then CLI args). Batch mode supports **`--jsonl`** with **`--all-lines`** (one JSON object per stdout line). **`--quiet`** / **`-q`** suppresses stdout on success (errors still on stderr); on Windows PowerShell prefer **`--quiet`** so `-q` is not swallowed by the shell. **`--help`** lists options. **`--version`** / **`-V`** / **`-v`** prints the **`@location-emitter/packet`** semver used for decode.
+Hex can be a single run of digits (no spaces) or piped/redirected into stdin when it is not a TTY. Use **`--file path`** to read from a file (first non-empty line if there are several, unless **`--all-lines`** / **`-a`** decodes every line into one JSON report). Root scripts: **`npm run decode-packet`**, **`npm run decode-packet-all`** (pass **`-- --`** then CLI args). Batch mode supports **`--jsonl`** with **`--all-lines`** (one JSON object per stdout line). **`--quiet`** / **`-q`** suppresses stdout on success (errors still on stderr); on Windows PowerShell prefer **`--quiet`** so `-q` is not swallowed by the shell. **`--strict`** fails on semantic warnings. **`--help`** lists options. **`--version`** / **`-V`** / **`-v`** prints the **`@location-emitter/packet`** semver used for decode.
 
 ## LoRa airtime (duty planning)
 
@@ -65,7 +71,7 @@ npm install
 npm run dev
 ```
 
-Paste a **LEP** or **mesh (LRM1)** hex line from serial (flexible separators: spaces, commas, or a continuous hex string); the map centers on the decoded position (SOS styled in red). **Paste clipboard** appends from the system clipboard and plots (handy on Android). **Encode** builds full LEP, BLE short, and mesh wires from GNSS, with **Mesh → decode** round-trip, **Fit all markers**, and **Ctrl+Enter** to plot (no BLE advertising from the browser). The peer map UI supports **Auto / Light / Dark** theme (saved in `localStorage`), keeps a **session draft** of hex and encode fields while the tab is open, restores **map pan/zoom** in the same session (unless you open a **`hex` URL**), reports **which lines** failed (with **decoder reasons** for bad frames), offers **sample hex** and **load file** (size-capped) for quick tests, draws a **dashed path** through multi-point decodes (stroke updates when you change theme), shows an **offline** hint when the network drops, and can **download GPX, CSV, or GeoJSON** (GeoJSON includes **`meta`** counts; CSV UTF-8 **with BOM** for Excel) from the last plotted decode plus an optional encode pin.
+Paste a **LEP** or **mesh (LRM1)** hex line from serial (flexible separators: spaces, commas, or a continuous hex string); the map centers on the decoded position (SOS styled in red). **Paste clipboard** appends from the system clipboard and plots (handy on Android). **Encode** builds full LEP, BLE short, and mesh wires from GNSS, with **Mesh → decode** round-trip, **Fit all markers**, and **Ctrl+Enter** to plot (no BLE advertising from the browser). The peer map UI supports **Auto / Light / Dark** theme (saved in `localStorage`), keeps a **session draft** of hex and encode fields while the tab is open, restores **map pan/zoom** in the same session (unless you open a **`hex` URL**), reports **which lines** failed (with **decoder reasons** for bad frames), offers **sample hex** and **load file** (size-capped) for quick tests, supports **Web Serial** / **Web Bluetooth** ingest buttons, keeps an **IndexedDB history timeline** via a slider, draws a **dashed path** through multi-point decodes (stroke updates when you change theme), shows an **offline** hint when the network drops, and can **download GPX, CSV, or GeoJSON** (GeoJSON includes **`meta`** counts; CSV UTF-8 **with BOM** for Excel) from the last plotted decode plus an optional encode pin.
 
 ### Peer map — Android (Capacitor)
 

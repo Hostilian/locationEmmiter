@@ -1,6 +1,9 @@
+/** LEP v1 `flags` byte bitmask (see spec). Alias for clarity at API boundaries. */
+export type LepFlags = number;
+
 export type LocationEmitterPacketV1 = {
   version: 1;
-  flags: number;
+  flags: LepFlags;
   unixTime: number;
   latE7: number;
   lonE7: number;
