@@ -46,6 +46,48 @@ Run a full demo cross-check (lint + typecheck + unit + e2e + APK build + artifac
 npm run demo:crosscheck
 ```
 
+Quick environment check (Node/NPM/Java/Capacitor + optional ADB):
+
+```bash
+npm run demo:preflight
+```
+
+Generate a demo artifact report (APK size + sha256 + environment snapshot):
+
+```bash
+npm run demo:report
+```
+
+Create a portable demo bundle (timestamped folder with APK + `manifest.json`):
+
+```bash
+npm run demo:bundle
+```
+
+Zip the latest bundle for handoff:
+
+```bash
+npm run demo:archive
+```
+
+Prune older demo artifacts (keeps latest 5 by default; override with `DEMO_KEEP`):
+
+```bash
+npm run demo:housekeep
+```
+
+Write machine-readable and human-readable latest status summaries:
+
+```bash
+npm run demo:status
+```
+
+Verify SHA consistency between latest report, bundle manifest, and status summary:
+
+```bash
+npm run demo:verify
+```
+
 Need a fallback installable build without opening Android Studio?
 
 ```bash

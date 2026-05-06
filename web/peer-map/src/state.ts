@@ -1,4 +1,3 @@
-import { type LocationEmitterPacketV1 } from '@location-emitter/packet';
 import { loadHistorySorted, type HistoryRow } from './historyStore.js';
 import { LS_THEME } from './storageKeys.js';
 

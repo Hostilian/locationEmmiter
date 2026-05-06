@@ -31,6 +31,13 @@ npm run build
 npm run demo:ready    # peer-map Android preflight
 npm run demo:studio   # preflight + open Android Studio
 npm run demo:apk      # preflight + build Android debug APK
+npm run demo:preflight # local toolchain sanity checks
+npm run demo:report   # generate demo APK report (size/hash/env)
+npm run demo:bundle   # package timestamped demo bundle + manifest
+npm run demo:archive  # zip latest demo bundle for handoff
+npm run demo:housekeep # prune older demo artifacts
+npm run demo:status   # write latest demo status summary (md + json)
+npm run demo:verify   # validate report/bundle/status SHA consistency
 npm run demo:crosscheck # full quality + demo artifact cross-check
 ```
 

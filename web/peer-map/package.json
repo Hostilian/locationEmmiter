@@ -20,6 +20,13 @@
     "cap:apk": "node ./scripts/cap-apk.mjs",
     "cap:doctor": "npx cap doctor",
     "android:sdk:setup": "node ./scripts/android-sdk-setup.mjs",
+    "demo:preflight": "node ./scripts/demo-preflight.mjs",
+    "demo:report": "node ./scripts/demo-report.mjs",
+    "demo:bundle": "node ./scripts/demo-bundle.mjs",
+    "demo:archive": "node ./scripts/demo-archive.mjs",
+    "demo:housekeep": "node ./scripts/demo-housekeep.mjs",
+    "demo:status": "node ./scripts/demo-status.mjs",
+    "demo:verify": "node ./scripts/demo-verify.mjs",
     "demo:ready": "npm run demo:clean && node ./scripts/demo-ready.mjs",
     "demo:studio": "npm run demo:ready && npm run cap:open",
     "demo:crosscheck": "node ./scripts/demo-crosscheck.mjs"

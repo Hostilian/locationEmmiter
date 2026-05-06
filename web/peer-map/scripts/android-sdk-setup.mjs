@@ -1,3 +1,4 @@
+/* global console, process */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { EOL, homedir, platform } from "node:os";
 import { resolve } from "node:path";

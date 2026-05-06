@@ -7,10 +7,16 @@ import {
   type LocationEmitterPacketV1,
 } from '@location-emitter/packet';
 import { encodeMeshFromPacket } from '@location-emitter/mesh';
-import { UI } from './ui.js';
-import { store } from './state.js';
 import { toHexSpaced } from './parseHex.js';
 import { STORAGE_DEVICE_ID } from './storageKeys.js';
+
+interface BatteryStatus {
+  level: number;
+}
+
+interface BatteryNavigator extends Navigator {
+  getBattery?: () => Promise<BatteryStatus>;
+}
 
 export class LogicManager {
   static getDeviceId(): Uint8Array {
@@ -35,7 +41,7 @@ export class LogicManager {
 
   static async getBattery(): Promise<number> {
     try {
-      const bat = await (navigator as any).getBattery?.();
+      const bat = await (navigator as BatteryNavigator).getBattery?.();
       if (!bat) return BATTERY_UNKNOWN;
       const n = Math.round(bat.level * 100);
       return n >= 0 && n <= 100 ? n : BATTERY_UNKNOWN;
