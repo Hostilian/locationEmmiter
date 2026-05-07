@@ -42,11 +42,11 @@ export const MapLayer: React.FC = React.memo(() => {
           source: 'peers',
           filter: ['!=', 'sos', true],
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 6, 15, 12],
-            'circle-color': '#6366f1',
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#ffffff',
-            'circle-opacity': 0.8
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 15, 14],
+            'circle-color': '#7c3aed',
+            'circle-stroke-width': 3,
+            'circle-stroke-color': 'rgba(255, 255, 255, 0.2)',
+            'circle-opacity': 0.9
           }
         });
 
@@ -56,11 +56,11 @@ export const MapLayer: React.FC = React.memo(() => {
           source: 'peers',
           filter: ['==', 'sos', true],
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 15, 16],
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 10, 15, 20],
             'circle-color': '#f43f5e',
-            'circle-stroke-width': 3,
+            'circle-stroke-width': 4,
             'circle-stroke-color': '#ffffff',
-            'circle-opacity': 0.9
+            'circle-opacity': 1
           }
         });
 
@@ -74,21 +74,30 @@ export const MapLayer: React.FC = React.memo(() => {
           }
 
           const popupContent = `
-            <div class="p-3 bg-slate-900 text-white rounded-lg border border-white/10 shadow-xl min-w-[160px]">
-              <div class="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
-                <div class="w-6 h-6 rounded bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/20">
-                  ${id.substring(0, 2)}
+            <div class="p-5 bg-[#050505]/95 backdrop-blur-xl text-white rounded-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] min-w-[200px] animate-fade-in-up">
+              <div class="flex items-center gap-3 mb-4 pb-4 border-b border-white/5">
+                <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-[11px] font-black text-primary border border-primary/20 shadow-inner">
+                  ${id.substring(0, 2).toUpperCase()}
                 </div>
-                <div class="font-mono text-xs font-bold">${id.substring(0, 12)}...</div>
+                <div>
+                  <div class="font-mono text-[11px] font-black tracking-tighter">${id.substring(0, 16)}...</div>
+                  <div class="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5">Tactical Node</div>
+                </div>
               </div>
-              <div class="space-y-1.5">
-                <div class="flex justify-between text-[10px]">
-                  <span class="text-slate-400">Battery</span>
-                  <span class="font-mono font-bold ${battery > 20 ? 'text-secondary' : 'text-danger'}">${battery}%</span>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter">Energy Core</span>
+                  <span class="font-mono text-[10px] font-black ${battery > 20 ? 'text-secondary' : 'text-danger'}">${battery}%</span>
                 </div>
-                <div class="flex justify-between text-[10px]">
-                  <span class="text-slate-400">Status</span>
-                  <span class="font-bold ${sos ? 'text-danger animate-pulse' : 'text-primary'}">${sos ? 'SOS' : 'Normal'}</span>
+                <div class="h-1 bg-white/5 rounded-full overflow-hidden">
+                  <div class="h-full ${battery > 20 ? 'bg-secondary' : 'bg-danger'} transition-all duration-1000" style="width: ${battery}%"></div>
+                </div>
+                <div class="flex justify-between items-center pt-1">
+                  <span class="text-[9px] font-bold text-zinc-500 uppercase tracking-tighter">Status</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full ${sos ? 'bg-danger animate-pulse' : 'bg-primary'}"></span>
+                    <span class="text-[9px] font-black uppercase ${sos ? 'text-danger' : 'text-primary'}">${sos ? 'CRITICAL' : 'OPTIMAL'}</span>
+                  </div>
                 </div>
               </div>
             </div>
