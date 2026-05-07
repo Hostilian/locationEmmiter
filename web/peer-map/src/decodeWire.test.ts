@@ -42,7 +42,7 @@ describe('decodeWireDetailed', () => {
     const d = decodeWireDetailed(bad);
     expect(d.ok).toBe(false);
     if (!d.ok) {
-      expect(d.reason).toMatch(/mesh|buffer too small|malformed/i);
+      expect(d.reason).toMatch(/packet too short|buffer|invalid/i);
     }
   });
 
@@ -59,7 +59,7 @@ describe('decodeWireDetailed', () => {
     const d = decodeWireDetailed(new Uint8Array());
     expect(d.ok).toBe(false);
     if (!d.ok) {
-      expect(d.reason).toBe('empty payload');
+      expect(d.reason).toBe('No data received.');
     }
   });
 });

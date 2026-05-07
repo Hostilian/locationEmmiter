@@ -6,19 +6,22 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import pino from 'pino';
 import { authMiddleware } from './auth.js';
+import { closeDatabaseConnection, initializeDatabase, runMigrations } from './db/database.js';
 import { echoRouter } from './routes/echo.js';
 import { healthRouter } from './routes/health.js';
+import { todosRouter } from './routes/todos.js';
 import { sendError } from './utils.js';
+import { setupWebSocket } from './websocket.js';
 
+const isProduction = process.env.NODE_ENV === 'production';
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  transport: process.env.NODE_ENV !== 'production' ? {
+  transport: isProduction ? undefined : {
     target: 'pino-pretty',
     options: { colorize: true }
-  } : undefined
+  }
 });
 
-const isProd = process.env.NODE_ENV === 'production';
 const corsOrigin = process.env.CORS_ORIGIN?.trim();
 const rateWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000);
 const rateMax = Number(process.env.RATE_LIMIT_MAX ?? 120);
@@ -127,6 +130,7 @@ export function createApp(options: AppOptions = {}): express.Express {
 
   // Protected Routes
   app.use('/api', authMiddleware);
+  app.use('/api/todos', todosRouter);
   app.use('/api', echoRouter);
 
   app.use((req, res) => {
@@ -154,13 +158,18 @@ export function createApp(options: AppOptions = {}): express.Express {
     }
     
     logger.error({ error, requestId: res.getHeader('x-request-id') }, 'Unhandled error');
-    sendError(res, 500, 'INTERNAL_ERROR', isProd ? 'Unexpected server error' : (error instanceof Error ? error.message : 'Unexpected server error'));
+    let errorMessage = 'Unexpected server error';
+    if (!isProduction && error instanceof Error) {
+      errorMessage = error.message;
+    }
+    sendError(res, 500, 'INTERNAL_ERROR', errorMessage);
   });
 
   return app;
 }
 
 import cluster from 'node:cluster';
+import { createServer } from 'node:http';
 import os from 'node:os';
 
 const isMainModule = process.argv[1] != null && fileURLToPath(import.meta.url) === process.argv[1];
@@ -179,9 +188,32 @@ if (isMainModule) {
     });
   } else {
     const port = Number(process.env.PORT ?? 8080);
-    createApp().listen(port, () => {
-      // eslint-disable-next-line no-console
-      console.log(`Worker ${process.pid} listening on :${port}`);
+    const app = createApp();
+    const httpServer = createServer(app);
+    
+    // Initialize database and run migrations
+    initializeDatabase();
+    try {
+      await runMigrations();
+    } catch (error) {
+      logger.error({ error }, 'Failed to run migrations');
+      process.exit(1);
+    }
+    
+    // Setup WebSocket
+    setupWebSocket(httpServer);
+
+    httpServer.listen(port, () => {
+      logger.info({ port }, `Worker ${process.pid} listening`);
+    });
+
+    // Graceful shutdown
+    process.on('SIGTERM', async () => {
+      logger.info('SIGTERM received, shutting down gracefully...');
+      httpServer.close(async () => {
+        await closeDatabaseConnection();
+        process.exit(0);
+      });
     });
   }
 }

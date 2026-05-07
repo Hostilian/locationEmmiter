@@ -1,19 +1,27 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import pino from 'pino';
+import type { Role } from './db/schema.js';
 import { sendError } from './utils.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lep-fallback-secret-2026';
+const logger = pino();
 
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    role: string;
-  };
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email?: string;
+        role: Role;
+      };
+    }
+  }
 }
 
-export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
+export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader?.startsWith('Bearer ')) {
     return sendError(res, 401, 'UNAUTHORIZED', 'Missing or invalid authorization header.');
   }
 
@@ -23,10 +31,15 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email?: string; role: Role };
     req.user = decoded;
     next();
   } catch (error) {
+    // JWT verification failed (invalid signature, expired token, etc.)
+    logger.debug(
+      { error: error instanceof Error ? error.message : String(error) },
+      'JWT verification failed'
+    );
     return sendError(res, 401, 'UNAUTHORIZED', 'Invalid or expired token.');
   }
 }
