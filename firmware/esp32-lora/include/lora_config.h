@@ -5,6 +5,21 @@
 #ifndef LORA_CONFIG_H
 #define LORA_CONFIG_H
 
+/**
+ * Regulatory Regions
+ */
+typedef enum {
+  REG_EU868, // EU 868MHz (ETSI 1% Duty Cycle, 14dBm)
+  REG_US915, // US 915MHz (FCC Part 15, 30dBm)
+  REG_AU915, // AU 915MHz (ACMA, 30dBm)
+  REG_JP920, // JP 920MHz (MIC/TELEC, LBT required, 13dBm/20mW)
+} RegulatoryRegion;
+
+// Default region if not overridden by build flags
+#ifndef LORA_REGION
+#define LORA_REGION REG_EU868
+#endif
+
 #if defined(LEP_BOARD_TBEAM_SX1262)
 #include "boards/tbeam_sx1262.h"
 #elif defined(LEP_BOARD_TBEAM)
@@ -24,9 +39,29 @@
 #define LEP_USE_SX1262 0
 #endif
 
-#ifndef LORA_FREQ
-#define LORA_FREQ 868.0f
+// Region-specific defaults
+#if LORA_REGION == REG_EU868
+  #define LORA_FREQ 868.0f
+  #define LORA_POWER 14
+  #define LORA_DUTY_LIMIT 0.01f
+  #define LORA_LBT_REQUIRED 0
+#elif LORA_REGION == REG_US915
+  #define LORA_FREQ 915.0f
+  #define LORA_POWER 30
+  #define LORA_DUTY_LIMIT 1.0f // No strict duty cycle, but FHSS/DTS rules apply
+  #define LORA_LBT_REQUIRED 0
+#elif LORA_REGION == REG_AU915
+  #define LORA_FREQ 915.0f
+  #define LORA_POWER 30
+  #define LORA_DUTY_LIMIT 1.0f
+  #define LORA_LBT_REQUIRED 0
+#elif LORA_REGION == REG_JP920
+  #define LORA_FREQ 920.8f
+  #define LORA_POWER 13
+  #define LORA_DUTY_LIMIT 0.1f // Simplified for JP
+  #define LORA_LBT_REQUIRED 1
 #endif
+
 #ifndef LORA_BW
 #define LORA_BW 125.0f
 #endif
@@ -35,9 +70,6 @@
 #endif
 #ifndef LORA_CR
 #define LORA_CR 7
-#endif
-#ifndef LORA_POWER
-#define LORA_POWER 17
 #endif
 
 #endif

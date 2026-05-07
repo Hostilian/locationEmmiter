@@ -2,6 +2,7 @@
 #include <lep_mesh.h>
 #include <lep_v1.h>
 #include <lep_v2.h>
+#include <lep_relay.h>
 #include <lora_radio.h>
 #include "ota.h"
 #include "ble_manager.h"
@@ -36,10 +37,14 @@ void fill_demo_device_id(uint8_t out[8]) {
 
 #if defined(LEP_RECEIVER) && LEP_RECEIVER
 
+static lep_relay_state_t g_relay_state;
+
 void setup() {
   Serial.begin(115200);
   delay(300);
   Serial.println("location-emitter: LEP receiver (LRM1 + full decode) — match TX LoRa params in lora_config.h");
+
+  lep_relay_init(&g_relay_state);
 
   if (!lora_radio_ensure_init()) {
     Serial.println("LoRa init failed");
@@ -111,6 +116,23 @@ void loop() {
                 (unsigned long)hdr.unix_time, lat, lon, (int)hdr.alt_m, (unsigned)hdr.h_accuracy_m,
                 (unsigned)hdr.battery_pct, (unsigned)hdr.flags, text);
   printHex(buf, n);
+
+  // Relay logic
+  uint8_t new_hop = 0;
+  bool is_duplicate = false;
+  if (lep_relay_process(&g_relay_state, lep, lep_len, hop, &new_hop, &is_duplicate)) {
+    uint8_t relay_buf[256];
+    size_t relay_len = lep_mesh_wrap(lep, lep_len, new_hop, relay_buf, sizeof(relay_buf));
+    if (relay_len > 0) {
+      // Jittered relay to avoid collisions
+      delay(random(50, 500));
+      if (lora_send(relay_buf, relay_len)) {
+        Serial.printf("RELAYED: hop %u -> %u\n", hop, new_hop);
+      }
+    }
+  } else if (is_duplicate) {
+    Serial.println("Dropped: Duplicate packet");
+  }
 }
 
 #elif defined(LEP_GPS_BEACON) && LEP_GPS_BEACON

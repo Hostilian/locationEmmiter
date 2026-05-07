@@ -1,9 +1,11 @@
 import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
+import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import pino from 'pino';
+import { authMiddleware } from './auth.js';
 import { echoRouter } from './routes/echo.js';
 import { healthRouter } from './routes/health.js';
 import { sendError } from './utils.js';
@@ -106,7 +108,26 @@ export function createApp(options: AppOptions = {}): express.Express {
   });
 
   app.use(healthRouter);
-  app.use(echoRouter);
+  
+  // Public Auth Routes
+  app.post('/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    // POC: Allow any user with password 'lep-secret'
+    if (password === 'lep-secret') {
+      const token = jwt.sign(
+        { id: username || 'demo-user', role: 'user' }, 
+        process.env.JWT_SECRET || 'lep-fallback-secret-2026',
+        { expiresIn: '24h' }
+      );
+      res.json({ token });
+    } else {
+      sendError(res, 401, 'AUTH_FAILED', 'Invalid credentials.');
+    }
+  });
+
+  // Protected Routes
+  app.use('/api', authMiddleware);
+  app.use('/api', echoRouter);
 
   app.use((req, res) => {
     sendError(res, 404, 'NOT_FOUND', `No route for ${req.method} ${req.path}`);

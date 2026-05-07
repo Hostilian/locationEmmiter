@@ -5,3 +5,4 @@ export * from './decode.js';
 export * from './types.js';
 export * from './export.js';
 export * from './track.js';
+export * from './crypto.js';

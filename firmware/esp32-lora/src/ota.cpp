@@ -39,8 +39,9 @@ void ota_setup(const char* ssid, const char* password) {
   // Set Hostname
   ArduinoOTA.setHostname("location-emitter-node");
 
-  // Authentication
-  // ArduinoOTA.setPassword("admin");
+  // Authentication (Highly recommended for production)
+  // In a real product, this would be a per-device unique key or user-set password
+  ArduinoOTA.setPassword("lep-ota-2026");
 
   ArduinoOTA
     .onStart([]() {

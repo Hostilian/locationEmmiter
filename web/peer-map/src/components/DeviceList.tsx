@@ -5,7 +5,11 @@ import { useAppStore } from '../store/useAppStore';
 
 export const DeviceList: React.FC = React.memo(() => {
   const { t } = useTranslation();
-  const peers = useAppStore(useShallow(state => state.peers));
+  const { peers, inactivityTimeoutMs, setNickname } = useAppStore(useShallow(state => ({
+    peers: state.peers,
+    inactivityTimeoutMs: state.inactivityTimeoutMs,
+    setNickname: state.setNickname
+  })));
   const peerList = useMemo(() => Object.values(peers).sort((a, b) => b.lastSeenMs - a.lastSeenMs), [peers]);
 
   return (
@@ -33,34 +37,54 @@ export const DeviceList: React.FC = React.memo(() => {
             </p>
           </div>
         ) : (
-          peerList.map((peer, index) => (
-            <div 
-              key={peer.deviceIdHex}
-              className={`group p-4 rounded-xl border transition-all active:scale-[0.98] cursor-pointer animate-fade-in-up stagger-${(index % 4) + 1} ${
-                peer.lastSos 
-                  ? 'bg-danger/10 border-danger/30 hover:bg-danger/20' 
-                  : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06] hover:border-white/10 shadow-lg'
-              }`}
-              onClick={() => useAppStore.getState().setMapCenter([peer.lastLonE7 / 1e7, peer.lastLatE7 / 1e7])}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-colors ${
-                    peer.lastSos ? 'bg-danger/20 border-danger/40 text-danger' : 'bg-primary/10 border-primary/20 text-primary'
-                  }`}>
-                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-current stroke-[1.5]">
-                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-mono text-xs font-black text-white tracking-tighter">
-                      {peer.deviceIdHex.substring(0, 4)}...{peer.deviceIdHex.substring(peer.deviceIdHex.length - 4)}
+          peerList.map((peer, index) => {
+            const isInactive = (Date.now() - peer.lastSeenMs) > inactivityTimeoutMs;
+            
+            return (
+              <div 
+                key={peer.deviceIdHex}
+                className={`group p-4 rounded-xl border transition-all active:scale-[0.98] cursor-pointer animate-fade-in-up stagger-${(index % 4) + 1} ${
+                  peer.lastSos 
+                    ? 'bg-danger/10 border-danger/30 hover:bg-danger/20' 
+                    : isInactive 
+                      ? 'bg-zinc-900/40 border-white/5 opacity-60 grayscale-[0.5]'
+                      : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06] hover:border-white/10 shadow-lg'
+                }`}
+                onClick={() => useAppStore.getState().setMapCenter([peer.lastLonE7 / 1e7, peer.lastLatE7 / 1e7])}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-colors ${
+                      peer.lastSos ? 'bg-danger/20 border-danger/40 text-danger' : 'bg-primary/10 border-primary/20 text-primary'
+                    }`}>
+                      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-current stroke-[1.5]">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                      </svg>
                     </div>
-                    <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5">
-                      Last Ping: {Math.floor((Date.now() - peer.lastSeenMs) / 1000)}s
+                    <div>
+                      <div className="font-mono text-xs font-black text-white tracking-tighter flex items-center gap-2">
+                        {peer.nickname || `${peer.deviceIdHex.substring(0, 4)}...${peer.deviceIdHex.substring(peer.deviceIdHex.length - 4)}`}
+                        {!peer.nickname && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const name = prompt('Enter nickname:');
+                              if (name) setNickname(peer.deviceIdHex, name);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <svg viewBox="0 0 24 24" className="w-3 h-3 text-zinc-500 hover:text-primary fill-none stroke-current stroke-2">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-0.5">
+                        {isInactive ? 'INACTIVE' : `Last Ping: ${Math.floor((Date.now() - peer.lastSeenMs) / 1000)}s`}
+                      </div>
                     </div>
                   </div>
-                </div>
                 {peer.lastSos && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-danger text-white text-[9px] font-black animate-pulse shadow-lg shadow-danger/20">
                     <svg viewBox="0 0 24 24" className="w-3 h-3 fill-white">

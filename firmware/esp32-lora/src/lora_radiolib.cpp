@@ -49,30 +49,36 @@ bool lora_send(const uint8_t *data, size_t len) {
     return false;
   }
 
-  // ETSI Duty Cycle Enforcement (1% for 868MHz)
-  if (LORA_FREQ >= 868.0 && LORA_FREQ <= 870.0) {
+  // Regulatory Duty Cycle Enforcement
+  if (LORA_DUTY_LIMIT < 1.0f) {
     if (millis() < g_duty_cycle_unlock_ms) {
-      Serial.println("TX Blocked: Duty Cycle limit active");
+      Serial.printf("TX Blocked: Regulatory Duty Cycle limit (%.1f%%) active. Wait %lu ms\n", 
+                    LORA_DUTY_LIMIT * 100.0f, g_duty_cycle_unlock_ms - millis());
       return false;
     }
   }
 
-  // CSMA/CA: Clear Channel Assessment
+  // CSMA/CA and LBT (Listen Before Talk)
   bool channel_free = false;
   int backoff_ms = 10;
-  for (int cca_attempt = 0; cca_attempt < 5; cca_attempt++) {
+  const int max_attempts = LORA_LBT_REQUIRED ? 10 : 5; // More persistent for LBT regions
+  const int rssi_threshold = LORA_LBT_REQUIRED ? -80 : -90; // JP LBT threshold is often -80dBm
+
+  for (int cca_attempt = 0; cca_attempt < max_attempts; cca_attempt++) {
     int rssi = g_radio.getRSSI(); // Quick channel check
-    if (rssi < -90) { // Threshold for "channel free"
+    if (rssi < rssi_threshold) {
       channel_free = true;
       break;
     }
-    Serial.printf("CCA Busy (RSSI %d). Backing off %d ms...\n", rssi, backoff_ms);
+    Serial.printf("%s Busy (RSSI %d). Backing off %d ms...\n", 
+                  LORA_LBT_REQUIRED ? "LBT" : "CSMA/CA", rssi, backoff_ms);
     delay(backoff_ms);
     backoff_ms += random(10, 50);
   }
 
   if (!channel_free) {
-    Serial.println("TX Failed: Channel persistently busy (CSMA/CA)");
+    Serial.printf("TX Failed: Channel persistently busy (%s)\n", 
+                  LORA_LBT_REQUIRED ? "LBT" : "CSMA/CA");
     return false;
   }
 
@@ -86,10 +92,14 @@ bool lora_send(const uint8_t *data, size_t len) {
     return false;
   }
 
-  // Update Duty Cycle
-  if (LORA_FREQ >= 868.0 && LORA_FREQ <= 870.0) {
-    g_duty_cycle_unlock_ms = millis() + (toa_ms * 99); // 1% duty cycle
-    Serial.printf("TX Success. ToA: %lu ms. Duty Cycle Lock until: %lu ms\n", toa_ms, g_duty_cycle_unlock_ms);
+  // Update Duty Cycle Lockout
+  if (LORA_DUTY_LIMIT < 1.0f) {
+    // formula: gap = toa * (1/limit - 1)
+    // for 1% (0.01): gap = toa * (100 - 1) = toa * 99
+    // for 10% (0.1): gap = toa * (10 - 1) = toa * 9
+    uint32_t gap_ms = (uint32_t)(toa_ms * (1.0f / LORA_DUTY_LIMIT - 1.0f));
+    g_duty_cycle_unlock_ms = millis() + gap_ms;
+    Serial.printf("TX Success. ToA: %lu ms. Duty Cycle Lock for %lu ms\n", toa_ms, gap_ms);
   }
 
   return true;

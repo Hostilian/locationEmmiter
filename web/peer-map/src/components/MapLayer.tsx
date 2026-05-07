@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useAppStore } from '../store/useAppStore';
+import React, { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useAppStore } from '../store/useAppStore';
 
 // In a real app, this would be an env var
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibG9jYXRpb25lbWl0dGVyIiwiYSI6ImNtMHhndTR0azAweW8yanF6cTBrZGdha3AifQ.placeholder';
@@ -33,14 +33,58 @@ export const MapLayer: React.FC = React.memo(() => {
 
         map.current.addSource('peers', {
           type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] }
+          data: { type: 'FeatureCollection', features: [] },
+          cluster: true,
+          clusterMaxZoom: 14,
+          clusterRadius: 50
+        });
+
+        map.current.addLayer({
+          id: 'clusters',
+          type: 'circle',
+          source: 'peers',
+          filter: ['has', 'point_count'],
+          paint: {
+            'circle-color': [
+              'step',
+              ['get', 'point_count'],
+              '#51bbd6',
+              10,
+              '#f1f075',
+              30,
+              '#f28cb1'
+            ],
+            'circle-radius': [
+              'step',
+              ['get', 'point_count'],
+              20,
+              10,
+              30,
+              30,
+              40
+            ],
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#fff'
+          }
+        });
+
+        map.current.addLayer({
+          id: 'cluster-count',
+          type: 'symbol',
+          source: 'peers',
+          filter: ['has', 'point_count'],
+          layout: {
+            'text-field': ['get', 'point_count_abbreviated'],
+            'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+            'text-size': 12
+          }
         });
 
         map.current.addLayer({
           id: 'peers-normal',
           type: 'circle',
           source: 'peers',
-          filter: ['!=', 'sos', true],
+          filter: ['all', ['!', ['has', 'point_count']], ['!=', 'sos', true]],
           paint: {
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 15, 14],
             'circle-color': '#7c3aed',
@@ -54,7 +98,7 @@ export const MapLayer: React.FC = React.memo(() => {
           id: 'peers-sos',
           type: 'circle',
           source: 'peers',
-          filter: ['==', 'sos', true],
+          filter: ['all', ['!', ['has', 'point_count']], ['==', 'sos', true]],
           paint: {
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 10, 15, 20],
             'circle-color': '#f43f5e',
@@ -62,6 +106,22 @@ export const MapLayer: React.FC = React.memo(() => {
             'circle-stroke-color': '#ffffff',
             'circle-opacity': 1
           }
+        });
+
+        map.current.on('click', 'clusters', (e) => {
+          if (!map.current) return;
+          const features = map.current.queryRenderedFeatures(e.point, {
+            layers: ['clusters']
+          });
+          const clusterId = features[0].properties?.cluster_id;
+          const source = map.current.getSource('peers') as mapboxgl.GeoJSONSource;
+          source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+            if (err || !map.current) return;
+            map.current.easeTo({
+              center: (features[0].geometry as GeoJSON.Point).coordinates as [number, number],
+              zoom: zoom
+            });
+          });
         });
 
         map.current.on('click', ['peers-normal', 'peers-sos'], (e) => {

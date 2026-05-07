@@ -9,6 +9,7 @@
 #include <lep_v1.h>
 #include <lora_config.h>
 #include <lora_radio.h>
+#include <Preferences.h>
 
 #ifndef LEP_GPS_BEACON_PERIOD_MS
 #define LEP_GPS_BEACON_PERIOD_MS 30000u
@@ -33,6 +34,9 @@ static bool have_gps_date = false;
 static uint32_t last_rmc_utc = 0;
 static uint32_t last_rmc_ms = 0;
 
+static Preferences preferences;
+static uint32_t last_nvs_save_ms = 0;
+
 #ifndef LEP_GPS_RMC_UNIX_MAX_AGE_MS
 #define LEP_GPS_RMC_UNIX_MAX_AGE_MS 3000u
 #endif
@@ -51,6 +55,33 @@ static void fill_device_id(void) {
   }
   device_id[6] = 0;
   device_id[7] = 1;
+}
+
+static void load_rtc_cache() {
+  preferences.begin("gnss_cache", true);
+  int32_t lat = preferences.getInt("lat", 0);
+  int32_t lon = preferences.getInt("lon", 0);
+  uint32_t last_time = preferences.getUInt("time", 0);
+  preferences.end();
+
+  if (lat != 0 || lon != 0) {
+    Serial.printf("RTC Cache: Loaded last position %.7f, %.7f (Time: %lu)\n", 
+                  lat / 1e7, lon / 1e7, (unsigned long)last_time);
+    // Use this to speed up TTFF by seeding the module if possible
+    // For now, just store in last_hdr
+    last_hdr.lat_e7 = lat;
+    last_hdr.lon_e7 = lon;
+    last_hdr.unix_time = last_time;
+  }
+}
+
+static void save_rtc_cache(int32_t lat, int32_t lon, uint32_t unix_time) {
+  preferences.begin("gnss_cache", false);
+  preferences.putInt("lat", lat);
+  preferences.putInt("lon", lon);
+  preferences.putUInt("time", unix_time);
+  preferences.end();
+  Serial.println("RTC Cache: Saved current fix to NVS");
 }
 
 static bool build_and_send(const lep_full_hdr_t *hdr) {
@@ -84,6 +115,7 @@ void gps_beacon_setup(void) {
   Serial.begin(115200);
   delay(300);
   fill_device_id();
+  load_rtc_cache();
   Serial.println("location-emitter: GPS → LEP mesh beacon (T-Beam onboard UART)");
   gps_serial = &Serial1;
   gps_serial->begin(GPS_UART_BAUD, SERIAL_8N1, GPS_UART_RX, GPS_UART_TX);
@@ -141,6 +173,12 @@ void gps_beacon_loop(void) {
           have_fix = true;
           Serial.printf("GNSS fix lat=%.7f lon=%.7f alt=%d\n", fix.lat_e7 / 1e7, fix.lon_e7 / 1e7,
                         (int)fix.alt_m);
+
+          // Save to NVS every 5 minutes to avoid flash wear
+          if (millis() - last_nvs_save_ms > 300000) {
+            save_rtc_cache(fix.lat_e7, fix.lon_e7, last_hdr.unix_time);
+            last_nvs_save_ms = millis();
+          }
         }
       }
       nmea_len = 0;

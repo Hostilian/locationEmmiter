@@ -97,4 +97,22 @@ export class LogicManager {
       text: 'Sample SOS',
     };
   }
+
+  static async exportData(peers: any) {
+    const data = JSON.stringify(peers, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `location-emitter-export-${new Date().toISOString()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  static async deleteAccount() {
+    if (confirm("Are you sure you want to delete all local data? This cannot be undone.")) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  }
 }

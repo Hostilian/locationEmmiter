@@ -53,6 +53,8 @@ size_t lep_v2_encrypt(uint8_t *out, size_t out_cap, const uint8_t *in, size_t in
   return need;
 }
 
+static uint32_t g_last_received_unix_time = 0;
+
 size_t lep_v2_decrypt(uint8_t *out, size_t out_cap, const uint8_t *in, size_t in_len, const uint8_t *key) {
   if (in_len <= 8 + LEP_NONCE_LEN + LEP_MAC_TAG_LEN) return 0;
   
@@ -85,6 +87,22 @@ size_t lep_v2_decrypt(uint8_t *out, size_t out_cap, const uint8_t *in, size_t in
   if (ret != 0) {
     Serial.println("mbedtls_chachapoly_auth_decrypt failed (MAC invalid!)");
     return 0;
+  }
+
+  // Replay Protection: Check unix_time if available
+  // Note: In a real system, you'd track this per device_id. 
+  // For this POC, we check against a global last-seen time.
+  if (encrypted_len >= sizeof(lep_v2_encrypted_packet_t) - 8) {
+    lep_v2_encrypted_packet_t *pkt = (lep_v2_encrypted_packet_t *)plain;
+    // Basic replay check: time must be strictly increasing or within a small window
+    // (allowing for some clock drift or multi-path delivery)
+    if (pkt->unix_time > 0 && pkt->unix_time <= g_last_received_unix_time) {
+      Serial.printf("Replay detected: packet time %lu <= last seen %lu\n", pkt->unix_time, g_last_received_unix_time);
+      // return 0; // Uncomment to strictly block replays
+    }
+    if (pkt->unix_time > g_last_received_unix_time) {
+      g_last_received_unix_time = pkt->unix_time;
+    }
   }
 
   // Restore v1 header structure

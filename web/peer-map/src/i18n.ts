@@ -12,7 +12,34 @@ const resources = {
       "demo": "✨ Demo",
       "active_peers": "Active Peers",
       "ago": "s ago",
-      "battery": "Battery"
+      "battery": "Battery",
+      "units_metric": "Metric",
+      "units_imperial": "Imperial",
+      "export_data": "Export Data",
+      "delete_account": "Delete Account",
+      "weak_signal": "Weak GPS Signal",
+      "onboarding_title": "Before you start",
+      "onboarding_text": "Location Emitter tracks your location to share it with your mesh group. This works even offline."
+    }
+  },
+  ar: {
+    translation: {
+      "app_title": "باعث الموقع",
+      "connect_ble": "اتصال BLE",
+      "disconnect_ble": "قطع اتصال BLE",
+      "manual_input": "إدخال يدوي",
+      "decode": "فك التشفير",
+      "demo": "✨ عرض تجريبي",
+      "active_peers": "الأقران النشطون",
+      "ago": "ثانية مضت",
+      "battery": "البطارية",
+      "units_metric": "متري",
+      "units_imperial": "إمبراطوري",
+      "export_data": "تصدير البيانات",
+      "delete_account": "حذف الحساب",
+      "weak_signal": "إشارة GPS ضعيفة",
+      "onboarding_title": "قبل البدء",
+      "onboarding_text": "يتتبع باعث الموقع موقعك لمشاركته مع مجموعة الشبكة الخاصة بك. هذا يعمل حتى بدون اتصال بالإنترنت."
     }
   },
   fr: {
