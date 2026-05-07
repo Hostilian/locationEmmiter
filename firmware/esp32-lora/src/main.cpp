@@ -1,7 +1,13 @@
 #include <Arduino.h>
 #include <lep_mesh.h>
 #include <lep_v1.h>
+#include <lep_v2.h>
 #include <lora_radio.h>
+#include "ota.h"
+#include "ble_manager.h"
+#include <esp_task_wdt.h>
+
+#define WDT_TIMEOUT_SECONDS 15
 
 #if defined(LEP_RECEIVER) && LEP_RECEIVER
 #include <lep_decode.h>
@@ -38,9 +44,19 @@ void setup() {
   if (!lora_radio_ensure_init()) {
     Serial.println("LoRa init failed");
   }
+  
+  // Initialize Watchdog Timer
+  esp_task_wdt_init(WDT_TIMEOUT_SECONDS, true);
+  esp_task_wdt_add(NULL);
+  
+  // Set up OTA update over WiFi (Demo credentials for now)
+  ota_setup("YOUR_WIFI_SSID", "YOUR_WIFI_PASSWORD");
 }
 
 void loop() {
+  esp_task_wdt_reset();
+  ota_loop();
+  
   uint8_t buf[256];
   size_t n = 0;
   if (!lora_try_receive(buf, sizeof(buf), &n) || n < LEP_MESH_HEADER_LEN + 36) {
@@ -59,9 +75,30 @@ void loop() {
     return;
   }
 
+  uint8_t static_key[32] = { 
+    0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF,0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF,
+    0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF,0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF 
+  };
+  
+  // Try to decrypt if it's v2
+  uint8_t decrypted[256];
+  const uint8_t *payload_to_decode = lep;
+  size_t payload_len_to_decode = lep_len;
+  
+  if (lep_len > 8 && lep[4] == LEP_VERSION_2) {
+    size_t dec_len = lep_v2_decrypt(decrypted, sizeof(decrypted), lep, lep_len, static_key);
+    if (dec_len == 0) {
+      Serial.println("LEP v2 decrypt failed (invalid MAC or key)");
+      delay(50);
+      return;
+    }
+    payload_to_decode = decrypted;
+    payload_len_to_decode = dec_len;
+  }
+
   lep_full_hdr_t hdr {};
   char text[40];
-  if (!lep_decode_full(lep, lep_len, &hdr, text, sizeof(text))) {
+  if (!lep_decode_full(payload_to_decode, payload_len_to_decode, &hdr, text, sizeof(text))) {
     Serial.println("LEP decode failed (CRC/length)");
     printHex(buf, n);
     delay(50);
@@ -79,10 +116,16 @@ void loop() {
 #elif defined(LEP_GPS_BEACON) && LEP_GPS_BEACON
 
 void setup() {
+  esp_task_wdt_init(WDT_TIMEOUT_SECONDS, true);
+  esp_task_wdt_add(NULL);
+  
   gps_beacon_setup();
+  ota_setup("YOUR_WIFI_SSID", "YOUR_WIFI_PASSWORD");
 }
 
 void loop() {
+  esp_task_wdt_reset();
+  ota_loop();
   gps_beacon_loop();
 }
 
@@ -93,6 +136,9 @@ void loop() {
 #endif
 
 void setup() {
+  esp_task_wdt_init(WDT_TIMEOUT_SECONDS, true);
+  esp_task_wdt_add(NULL);
+  
   Serial.begin(115200);
   delay(500);
   Serial.println("location-emitter: LEP v1 + mesh wrapper (LoRa optional — env esp32dev_lora / tbeam_lora)");
@@ -115,14 +161,33 @@ void setup() {
     Serial.println("lep_encode_full failed");
     return;
   }
-  Serial.print("Full LEP (");
+  Serial.print("Full LEP v1 (");
   Serial.print(n);
   Serial.println(" bytes):");
   printHex(full, n);
 
-  uint8_t mesh[128];
+  // v2 Encryption Phase
+  uint8_t static_key[32] = { 
+    0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF,0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF,
+    0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF,0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF 
+  };
+  
+  uint8_t full_v2[128];
+  const size_t n_v2 = lep_v2_encrypt(full_v2, sizeof(full_v2), full, n, static_key);
+  if (n_v2 == 0) {
+    Serial.println("lep_v2_encrypt failed");
+    return;
+  }
+  
+  Serial.print("Encrypted LEP v2 (");
+  Serial.print(n_v2);
+  Serial.println(" bytes):");
+  printHex(full_v2, n_v2);
+
+  uint8_t mesh[256];
   const uint8_t hop = lep_mesh_initial_hop(hdr.flags);
-  const size_t nm = lep_mesh_wrap(full, n, hop, mesh, sizeof(mesh));
+  // Wrap the encrypted v2 payload
+  const size_t nm = lep_mesh_wrap(full_v2, n_v2, hop, mesh, sizeof(mesh));
   if (nm == 0) {
     Serial.println("lep_mesh_wrap failed");
     return;
@@ -139,6 +204,8 @@ void setup() {
     Serial.println("LoRa TX not available or failed (use lora env + wiring)");
   }
 
+  ble_manager_setup(did);
+
   uint8_t ble[32];
   const size_t nb = lep_encode_ble_short(ble, sizeof(ble), &hdr);
   if (nb == 0) {
@@ -149,12 +216,18 @@ void setup() {
   Serial.print(nb);
   Serial.println(" bytes):");
   printHex(ble, nb);
+  
+  ble_manager_update_payload(ble, nb);
 #else
   Serial.println("Demo TX disabled (set -D LEP_DEMO_TX=1 to enable sample beacon output).");
 #endif
+  
+  ota_setup("YOUR_WIFI_SSID", "YOUR_WIFI_PASSWORD");
 }
 
 void loop() {
+  esp_task_wdt_reset();
+  ota_loop();
   delay(10000);
 }
 

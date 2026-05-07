@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 import { VitePWA } from 'vite-plugin-pwa';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   base: './',
@@ -12,6 +13,7 @@ export default defineConfig({
   },
   server: { port: 5173 },
   plugins: [
+    react(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'manifest.webmanifest'],
@@ -20,19 +22,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,webmanifest}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/[a-z0-9.-]+\.tile\.openstreetmap\.org\/.*/i,
+            urlPattern: /^https:\/\/api\.mapbox\.com\/.*/i,
             handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'osm-tiles',
-              expiration: { maxEntries: 160, maxAgeSeconds: 43200 },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/[a-z0-9.-]+\.basemaps\.cartocdn\.com\/.*/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'carto-tiles',
-              expiration: { maxEntries: 160, maxAgeSeconds: 43200 },
+              cacheName: 'mapbox-tiles',
+              expiration: { maxEntries: 500, maxAgeSeconds: 2592000 },
             },
           },
         ],

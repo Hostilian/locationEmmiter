@@ -14,6 +14,7 @@ static SX1276 g_radio = new Module(LORA_CS, LORA_DIO0, LORA_RST, LORA_DIO1);
 
 static bool g_lora_inited = false;
 static uint32_t g_init_failures = 0;
+static uint32_t g_duty_cycle_unlock_ms = 0; // Absolute millis() when TX is allowed again
 
 bool lora_radio_ensure_init(void) {
   if (g_lora_inited) {
@@ -47,12 +48,50 @@ bool lora_send(const uint8_t *data, size_t len) {
   if (!lora_radio_ensure_init()) {
     return false;
   }
+
+  // ETSI Duty Cycle Enforcement (1% for 868MHz)
+  if (LORA_FREQ >= 868.0 && LORA_FREQ <= 870.0) {
+    if (millis() < g_duty_cycle_unlock_ms) {
+      Serial.println("TX Blocked: Duty Cycle limit active");
+      return false;
+    }
+  }
+
+  // CSMA/CA: Clear Channel Assessment
+  bool channel_free = false;
+  int backoff_ms = 10;
+  for (int cca_attempt = 0; cca_attempt < 5; cca_attempt++) {
+    int rssi = g_radio.getRSSI(); // Quick channel check
+    if (rssi < -90) { // Threshold for "channel free"
+      channel_free = true;
+      break;
+    }
+    Serial.printf("CCA Busy (RSSI %d). Backing off %d ms...\n", rssi, backoff_ms);
+    delay(backoff_ms);
+    backoff_ms += random(10, 50);
+  }
+
+  if (!channel_free) {
+    Serial.println("TX Failed: Channel persistently busy (CSMA/CA)");
+    return false;
+  }
+
+  uint32_t tx_start = millis();
   std::vector<uint8_t> copy(data, data + len);
   const int st = g_radio.transmit(copy.data(), copy.size());
+  uint32_t toa_ms = millis() - tx_start;
+
   if (st != RADIOLIB_ERR_NONE) {
     Serial.printf("RadioLib transmit failed: %d\n", st);
     return false;
   }
+
+  // Update Duty Cycle
+  if (LORA_FREQ >= 868.0 && LORA_FREQ <= 870.0) {
+    g_duty_cycle_unlock_ms = millis() + (toa_ms * 99); // 1% duty cycle
+    Serial.printf("TX Success. ToA: %lu ms. Duty Cycle Lock until: %lu ms\n", toa_ms, g_duty_cycle_unlock_ms);
+  }
+
   return true;
 }
 

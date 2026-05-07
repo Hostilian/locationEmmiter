@@ -1,0 +1,25 @@
+default_platform(:android)
+
+platform :android do
+  desc "Runs all the tests"
+  lane :test do
+    gradle(task: "test")
+  end
+
+  desc "Submit a new Beta Build to Crashlytics/App Distribution"
+  lane :beta do
+    gradle(task: "clean bundleRelease")
+    firebase_app_distribution(
+      app: "YOUR_FIREBASE_APP_ID",
+      release_notes: "Bug fixes and improvements",
+      groups: "internal-testers"
+    )
+  end
+
+  desc "Deploy a new version to the Google Play Store"
+  lane :release do
+    # Requires KEYSTORE setup in gradle
+    gradle(task: "clean bundleRelease")
+    upload_to_play_store(track: 'production')
+  end
+end

@@ -22,6 +22,17 @@ Offline-first **position beacons** for **peer tracking** and **SOS-style** use: 
 | [docs/REGULATORY_AIRTIME.md](docs/REGULATORY_AIRTIME.md) | LoRa **time-on-air** notes + `npm run airtime` calculator |
 | [docs/GPS_BEACON.md](docs/GPS_BEACON.md) | **T-Beam**: GNSS NMEA → periodic **LEP mesh** TX (`tbeam_gps` / `tbeam_sx1262_gps`) |
 
+## Architecture Flow
+
+```mermaid
+graph TD
+    A[GPS Module] -->|UART| B(ESP32 Firmware)
+    B -->|lep_v2 Encrypt| C{LoRa Radio}
+    C -->|Mesh LRM1| D[Peer Nodes]
+    D -->|BLE Secure Bonding| E[Mobile App / Web Dashboard]
+    E -->|Cloud Gateway| F[(PostHog / AWS Relay)]
+```
+
 ## Monorepo scripts (from repo root)
 
 ```bash

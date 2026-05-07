@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Emitter - Pitch Deck Data Assets</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 40px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 40px;
+        }
+        .chart-container {
+            background: rgba(22, 27, 34, 0.8);
+            border: 1px solid #30363d;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease;
+        }
+        .chart-container:hover {
+            transform: translateY(-5px);
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: #58a6ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+        canvas {
+            width: 100% !important;
+            height: 300px !important;
+        }
+        .header-full {
+            grid-column: 1 / -1;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header-full h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #ff7b72, #79c0ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-full p {
+            color: #8b949e;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-full">
+        <h1>Location Emitter Data Assets</h1>
+        <p>Interactive Data Visualizations for Y Combinator Pitch Deck</p>
+    </div>
+
+    <!-- Battery Longevity Chart -->
+    <div class="chart-container">
+        <h2>Battery Longevity (ESP32)</h2>
+        <canvas id="batteryChart"></canvas>
+    </div>
+
+    <!-- Mesh Network Scalability Chart -->
+    <div class="chart-container">
+        <h2>Mesh Network Scalability</h2>
+        <canvas id="meshChart"></canvas>
+    </div>
+
+    <!-- RF Range Field Tests Chart -->
+    <div class="chart-container">
+        <h2>RF Range Performance (LoRa)</h2>
+        <canvas id="rangeChart"></canvas>
+    </div>
+
+    <script>
+        Chart.defaults.color = '#8b949e';
+        Chart.defaults.font.family = 'Inter';
+
+        // 1. Battery Longevity (Bar Chart)
+        const ctxBattery = document.getElementById('batteryChart').getContext('2d');
+        new Chart(ctxBattery, {
+            type: 'bar',
+            data: {
+                labels: ['Standard iPhone', 'Garmin inReach', 'Our ESP32 Node (Active)', 'Our ESP32 Node (Deep Sleep)'],
+                datasets: [{
+                    label: 'Estimated Battery Life (Days)',
+                    data: [1.5, 14, 5, 45],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.9)'
+                    ],
+                    borderColor: [
+                        '#ff6384',
+                        '#36a2eb',
+                        '#ffce56',
+                        '#4bc0c0'
+                    ],
+                    borderWidth: 1,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, grid: { color: '#30363d' } }, x: { grid: { display: false } } }
+            }
+        });
+
+        // 2. Mesh Scalability (Line Chart)
+        const ctxMesh = document.getElementById('meshChart').getContext('2d');
+        const gradient = ctxMesh.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(121, 192, 255, 0.5)');
+        gradient.addColorStop(1, 'rgba(121, 192, 255, 0.0)');
+
+        new Chart(ctxMesh, {
+            type: 'line',
+            data: {
+                labels: ['1 Node', '5 Nodes', '10 Nodes', '20 Nodes', '50 Nodes', '100+ Nodes'],
+                datasets: [{
+                    label: 'Effective Coverage Area (sq km)',
+                    data: [2, 12, 35, 85, 250, 600],
+                    borderColor: '#79c0ff',
+                    backgroundColor: gradient,
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#ff7b72',
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, grid: { color: '#30363d' } }, x: { grid: { display: false } } }
+            }
+        });
+
+        // 3. RF Range Tests (Radar Chart)
+        const ctxRange = document.getElementById('rangeChart').getContext('2d');
+        new Chart(ctxRange, {
+            type: 'radar',
+            data: {
+                labels: ['Urban (Dense)', 'Suburban', 'Dense Forest', 'Open Water (LOS)', 'Mountain Top'],
+                datasets: [{
+                    label: 'Max Range (km)',
+                    data: [1.2, 4.5, 2.8, 15.0, 25.0],
+                    backgroundColor: 'rgba(163, 113, 247, 0.4)',
+                    borderColor: '#a371f7',
+                    pointBackgroundColor: '#a371f7',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: '#a371f7',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: { color: '#30363d' },
+                        grid: { color: '#30363d' },
+                        pointLabels: { color: '#c9d1d9', font: { size: 12 } },
+                        ticks: { display: false }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
