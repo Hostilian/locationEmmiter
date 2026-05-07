@@ -66,8 +66,12 @@ export const MapLayer: React.FC = React.memo(() => {
 
         map.current.on('click', ['peers-normal', 'peers-sos'], (e) => {
           if (!e.features || e.features.length === 0 || !map.current) return;
-          const coordinates = (e.features[0].geometry as any).coordinates.slice();
-          const { id, battery, sos } = e.features[0].properties as any;
+          
+          const feature = e.features[0];
+          const geometry = feature.geometry as GeoJSON.Point;
+          const coordinates = geometry.coordinates.slice() as [number, number];
+          const properties = feature.properties as { id: string; battery: number; sos: boolean };
+          const { id, battery, sos } = properties;
           
           while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
             coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;

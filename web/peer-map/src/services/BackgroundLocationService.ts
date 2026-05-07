@@ -1,8 +1,32 @@
 import { registerPlugin } from '@capacitor/core';
 import { useAppStore } from '../store/useAppStore';
 
+interface BackgroundGeolocationLocation {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  altitude?: number;
+  speed?: number;
+  bearing?: number;
+  simulated?: boolean;
+}
+
+interface BackgroundGeolocationPlugin {
+  addWatcher(
+    options: {
+      backgroundMessage?: string;
+      backgroundTitle?: string;
+      requestPermissions?: boolean;
+      stale?: boolean;
+      distanceFilter?: number;
+    },
+    callback: (location: BackgroundGeolocationLocation | null, error: unknown) => void
+  ): Promise<string>;
+  removeWatcher(options: { id: string }): Promise<void>;
+}
+
 // Get the plugin
-const BackgroundGeolocation = registerPlugin<any>('BackgroundGeolocation');
+const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
 export class BackgroundLocationService {
   private static watcherId: string | null = null;
@@ -19,7 +43,7 @@ export class BackgroundLocationService {
           stale: false,
           distanceFilter: 10, // Update every 10 meters
         },
-        (location: any, error: any) => {
+        (location, error) => {
           if (error) {
             console.error('Background Geolocation Error:', error);
             return;

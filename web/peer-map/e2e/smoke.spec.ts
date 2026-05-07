@@ -6,8 +6,13 @@ test('home loads and shows Location Emitter heading', async ({ page }) => {
   await expect(page.locator('button', { hasText: 'Connect BLE' })).toBeVisible();
 });
 
-test('ble connection toggle works', async ({ page }) => {
+test('ble connection toggle works', async ({ page, isMobile }) => {
   await page.goto('/');
+  
+  if (isMobile) {
+    await page.getByRole('button', { name: 'View Controls' }).click();
+  }
+
   const bleBtn = page.locator('button', { hasText: 'Connect BLE' });
   await bleBtn.click();
   await expect(page.locator('button', { hasText: 'Disconnect BLE' })).toBeVisible();
@@ -17,11 +22,22 @@ test('ble connection toggle works', async ({ page }) => {
   await expect(page.locator('button', { hasText: 'Connect BLE' })).toBeVisible();
 });
 
-test('demo button populates active peers', async ({ page }) => {
+test('demo button populates active peers', async ({ page, isMobile }) => {
   await page.goto('/');
+  
+  if (isMobile) {
+    await page.getByRole('button', { name: 'View Controls' }).click();
+  }
+
   const demoBtn = page.locator('button', { hasText: '✨ Demo' });
   await demoBtn.click();
   
+  if (isMobile) {
+    // On mobile, the active peers are in a different tab
+    await page.getByRole('button', { name: 'Close' }).click();
+    await page.getByRole('button', { name: 'View Active Peers' }).click();
+  }
+
   // It should spawn a device list panel
   await expect(page.locator('h3', { hasText: 'Active Peers' })).toBeVisible();
   
