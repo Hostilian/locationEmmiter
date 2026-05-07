@@ -1,8 +1,122 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #7c3aed;
+  --color-primary-light: #a78bfa;
+  --color-primary-dark: #5b21b6;
+  
+  --color-secondary: #10b981;
+  --color-secondary-light: #34d399;
+  
+  --color-danger: #f43f5e;
+  --color-danger-light: #fb7185;
+  
+  --color-surface: #050505;
+  --color-surface-elevated: #111111;
+  --color-surface-border: rgba(255, 255, 255, 0.08);
+  
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", var(--font-sans);
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+}
+
 @layer base {
-  body {
-    background-color: #09090b;
-    color: #f1f5f9;
+  :root {
+    --bg-main: #050505;
+    --text-main: #fafafa;
+    --text-muted: #a1a1aa;
+    --accent-glow: 0 0 20px rgba(124, 58, 237, 0.3);
   }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+  }
+
+  /* Custom Scrollbar for modern look */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-surface/80 backdrop-blur-2xl border border-surface-border rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)];
+  }
+
+  .glass-panel-light {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-xl;
+  }
+
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-light text-white font-bold py-2.5 px-5 rounded-lg transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-primary/20 hover:shadow-primary/30;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-elevated hover:bg-white/10 text-zinc-200 border border-surface-border font-semibold py-2.5 px-5 rounded-lg transition-all active:scale-95;
+  }
+
+  .input-field {
+    @apply bg-black/60 border border-surface-border rounded-lg p-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-zinc-600;
+  }
+
+  .badge-primary {
+    @apply px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-black border border-primary/20 uppercase tracking-wider;
+  }
+
+  /* Animations */
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; filter: drop-shadow(0 0 5px var(--color-primary)); }
+    50% { opacity: 0.7; filter: drop-shadow(0 0 15px var(--color-primary)); }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
 }

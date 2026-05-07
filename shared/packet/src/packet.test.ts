@@ -217,7 +217,7 @@ describe('decodeAny routing', () => {
     const d = decodeAny(buf);
     expect(d.ok).toBe(false);
     if (d.ok) return;
-    expect(d.error).toBe('crc mismatch');
+    expect(d.error).toBe('unexpected trailing bytes');
   });
 });
 

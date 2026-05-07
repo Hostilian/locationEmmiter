@@ -21,24 +21,27 @@ interface AppState {
   clearHistory: () => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  peers: {},
-  bleConnected: false,
-  mapCenter: [2.2945, 48.8584], // Default to Paris (Eiffel Tower approx)
+let packetBuffer: LocationEmitterPacketV1[] = [];
+let flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  addPacket: (packet) => set((state) => {
-    const devHex = [...packet.deviceId].map(b => b.toString(16).padStart(2, '0')).join('');
-    const isSos = (packet.flags & 1) !== 0; // FLAG_SOS
+export const useAppStore = create<AppState>((set) => {
+  const flushPackets = () => {
+    if (packetBuffer.length === 0) return;
+    const packets = [...packetBuffer];
+    packetBuffer = [];
     
-    const existing = state.peers[devHex] || {
-      deviceIdHex: devHex,
-      packets: [],
-    };
-    
-    return {
-      peers: {
-        ...state.peers,
-        [devHex]: {
+    set((state) => {
+      const newPeers = { ...state.peers };
+      for (const packet of packets) {
+        const devHex = [...packet.deviceId].map(b => b.toString(16).padStart(2, '0')).join('');
+        const isSos = (packet.flags & 1) !== 0; // FLAG_SOS
+        
+        const existing = newPeers[devHex] || {
+          deviceIdHex: devHex,
+          packets: [],
+        };
+        
+        newPeers[devHex] = {
           ...existing,
           lastSeenMs: packet.unixTime * 1000,
           lastLatE7: packet.latE7,
@@ -46,12 +49,29 @@ export const useAppStore = create<AppState>((set) => ({
           lastBatteryPct: packet.batteryPct,
           lastSos: isSos,
           packets: [...existing.packets, packet]
-        }
+        };
       }
-    };
-  }),
+      return { peers: newPeers };
+    });
+  };
 
-  setBleConnected: (connected) => set({ bleConnected: connected }),
-  setMapCenter: (lngLat) => set({ mapCenter: lngLat }),
-  clearHistory: () => set({ peers: {} }),
-}));
+  return {
+    peers: {},
+    bleConnected: false,
+    mapCenter: [2.2945, 48.8584],
+
+    addPacket: (packet) => {
+      packetBuffer.push(packet);
+      if (!flushTimeout) {
+        flushTimeout = setTimeout(() => {
+          flushTimeout = null;
+          flushPackets();
+        }, 33); // ~30 FPS throttling
+      }
+    },
+
+    setBleConnected: (connected) => set({ bleConnected: connected }),
+    setMapCenter: (lngLat) => set({ mapCenter: lngLat }),
+    clearHistory: () => set({ peers: {} }),
+  };
+});

@@ -26,6 +26,7 @@
     "decode-packet": "node tools/decode-packet.mjs",
     "decode-packet-all": "node tools/decode-packet.mjs --all-lines",
     "decode-packet-all-jsonl": "node tools/decode-packet.mjs --all-lines --jsonl",
+    "export-packets": "node tools/export-packets.mjs",
     "encode-packet": "node tools/encode-packet.mjs",
     "airtime": "node tools/lora-airtime.mjs",
     "lint": "eslint shared web/peer-map/src",
@@ -39,9 +40,13 @@
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
     "@eslint/js": "^9.21.0",
+    "@types/jest": "^30.0.0",
     "eslint": "^9.21.0",
-    "eslint-config-prettier": "^10.0.1",
+    "eslint-config-prettier": "^10.1.8",
+    "fast-check": "^4.7.0",
+    "jest": "^30.3.0",
     "prettier": "^3.5.2",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.24.1"
   }
 }

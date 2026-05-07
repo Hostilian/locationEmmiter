@@ -38,3 +38,4 @@ This roadmap transforms the `locationEmmiter` prototype into a **thesis-defendab
 - [x] **Interactive API Docs**: Generate Swagger/OpenAPI docs for any cloud APIs, and TypeDoc for the `shared/packet` library.
 - [x] **One-Line Onboarding**: Ensure a new developer (or investor) can clone the repo and run a simulation with a single `npm run bootstrap` command.
 - [x] **Architecture Diagrams**: Add Mermaid diagrams to `README.md` illustrating the flow from GPS -> ESP32 -> LoRa Mesh -> BLE -> Mobile App -> Cloud.
+- [x] **Pre-Release Checklist**: Created comprehensive [PRE_RELEASE_CHECKLIST.md](file:///d:/CZUU/locationEmmiter/docs/PRE_RELEASE_CHECKLIST.md) for v1.1.0 release.

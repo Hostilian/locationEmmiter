@@ -8,6 +8,7 @@
     "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@location-emitter/packet": ["../../shared/packet/src/index.ts"],
       "@location-emitter/mesh": ["../../shared/mesh/src/index.ts"]

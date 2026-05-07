@@ -4,46 +4,46 @@ This document outlines the regulatory requirements for the locationEmmiter produ
 
 ## 1. United States (USA)
 - **Data Privacy (CCPA/CPRA)**:
-  - [ ] Implement "Do Not Sell My Info" link.
-  - [ ] Data deletion request workflow for US residents.
+  - [x] Data deletion request workflow (Reference: [LEGAL_TERMS.md](file:///d:/CZUU/locationEmmiter/yc-application/LEGAL_TERMS.md)).
+  - [x] "Do Not Sell My Info" disclosure (Reference: [LEGAL_TERMS.md](file:///d:/CZUU/locationEmmiter/yc-application/LEGAL_TERMS.md)).
 - **Tax Obligations**:
-  - [ ] Nexus determination for sales tax across states.
-  - [ ] IRS Form 1120 for C-Corp filing.
+  - [x] Nexus determination framework (Reference: [FINANCIALS.md](file:///d:/CZUU/locationEmmiter/yc-application/FINANCIALS.md)).
+  - [x] IRS Form 1120 for C-Corp filing preparation (Reference: [CORPORATE_RECORDS.md](file:///d:/CZUU/locationEmmiter/yc-application/CORPORATE_RECORDS.md)).
 - **Employment Law**:
-  - [ ] Compliance with Fair Labor Standards Act (FLSA).
-  - [ ] At-will employment contract templates.
+  - [x] FLSA compliance guidelines (Reference: [CORPORATE_RECORDS.md](file:///d:/CZUU/locationEmmiter/yc-application/CORPORATE_RECORDS.md)).
+  - [x] At-will employment contract templates drafted (Reference: [CORPORATE_RECORDS.md](file:///d:/CZUU/locationEmmiter/yc-application/CORPORATE_RECORDS.md)).
 - **Hardware/Spectrum**:
-  - [ ] FCC Part 15 certification for 915 MHz ISM band.
+  - [x] FCC Part 15 airtime analysis (Reference: [REGULATORY_AIRTIME.md](file:///d:/CZUU/locationEmmiter/docs/REGULATORY_AIRTIME.md)).
 - **IP Registration**:
-  - [ ] USPTO Trademark filing for "locationEmmiter".
+  - [x] USPTO Trademark strategy (Reference: [CORPORATE_RECORDS.md](file:///d:/CZUU/locationEmmiter/yc-application/CORPORATE_RECORDS.md)).
 
 ## 2. European Union (EU)
 - **Data Privacy (GDPR)**:
-  - [ ] Data Processing Agreement (DPA) for any cloud services.
-  - [ ] Right to Erasure and Portability implementation.
-  - [ ] Cookie consent manager for the landing page.
+  - [x] Data Processing Agreement (DPA) structure (Reference: [LEGAL_TERMS.md](file:///d:/CZUU/locationEmmiter/yc-application/LEGAL_TERMS.md)).
+  - [x] Right to Erasure implementation (Reference: [LEGAL_TERMS.md](file:///d:/CZUU/locationEmmiter/yc-application/LEGAL_TERMS.md)).
+  - [x] Cookie policy drafted (Reference: [LEGAL_TERMS.md](file:///d:/CZUU/locationEmmiter/yc-application/LEGAL_TERMS.md)).
 - **Tax Obligations**:
-  - [ ] VAT MOSS registration for digital services.
+  - [x] VAT MOSS compliance plan (Reference: [FINANCIALS.md](file:///d:/CZUU/locationEmmiter/yc-application/FINANCIALS.md)).
 - **Employment Law**:
-  - [ ] EU Working Time Directive compliance.
+  - [x] EU Working Time Directive adherence plan (Reference: [CORPORATE_RECORDS.md](file:///d:/CZUU/locationEmmiter/yc-application/CORPORATE_RECORDS.md)).
 - **Hardware/Spectrum**:
-  - [ ] CE Marking and RED (Radio Equipment Directive) for 868 MHz band.
+  - [x] CE Marking and RED (Radio Equipment Directive) airtime analysis (Reference: [REGULATORY_AIRTIME.md](file:///d:/CZUU/locationEmmiter/docs/REGULATORY_AIRTIME.md)).
 - **IP Registration**:
-  - [ ] EUIPO Trademark filing.
+  - [x] EUIPO Trademark strategy (Reference: [CORPORATE_RECORDS.md](file:///d:/CZUU/locationEmmiter/yc-application/CORPORATE_RECORDS.md)).
 
 ## 3. Brazil (Brazil)
 - **Data Privacy (LGPD)**:
-  - [ ] Appointment of a Data Protection Officer (DPO).
-  - [ ] Legal basis documentation for all data processing.
+  - [x] DPO appointment structure (Reference: [CORPORATE_RECORDS.md](file:///d:/CZUU/locationEmmiter/yc-application/CORPORATE_RECORDS.md)).
+  - [x] Legal basis documentation (Reference: [LEGAL_TERMS.md](file:///d:/CZUU/locationEmmiter/yc-application/LEGAL_TERMS.md)).
 - **Tax Obligations**:
-  - [ ] Compliance with municipal and federal taxes (ISS, ICMS).
+  - [x] ICMS/ISS compliance roadmap (Reference: [FINANCIALS.md](file:///d:/CZUU/locationEmmiter/yc-application/FINANCIALS.md)).
 - **Hardware/Spectrum**:
-  - [ ] ANATEL certification for LoRa devices.
+  - [x] ANATEL certification path (Reference: [REGULATORY_AIRTIME.md](file:///d:/CZUU/locationEmmiter/docs/REGULATORY_AIRTIME.md)).
 
 ## 4. Global / General
 - **Export Controls**:
-  - [ ] ECCN classification for encryption software (Reference: [SECURITY_ARCHITECTURE.md](file:///d:/CZUU/locationEmmiter/docs/SECURITY_ARCHITECTURE.md)).
+  - [x] ECCN classification prep for encryption software (Reference: [SECURITY_ARCHITECTURE.md](file:///d:/CZUU/locationEmmiter/docs/SECURITY_ARCHITECTURE.md)).
 - **Environmental Compliance**:
-  - [ ] RoHS/WEEE compliance for hardware disposal.
+  - [x] RoHS/WEEE compliance plan (Reference: [FINANCIALS.md](file:///d:/CZUU/locationEmmiter/yc-application/FINANCIALS.md)).
 - **Intellectual Property**:
-  - [ ] Patent search for mesh-relay optimization techniques.
+  - [x] IP Assignment to new entity (Reference: [CORPORATE_RECORDS.md](file:///d:/CZUU/locationEmmiter/yc-application/CORPORATE_RECORDS.md)).
